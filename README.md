@@ -1,4 +1,5 @@
-# Pype PHP Framework V2.5 — The Professional PHP Framework By Comibyte
+# Pype PHP Framework V2.5 
+### The Professional PHP Framework By Comibyte
 
 <div align="center">
   <img src="https://imgs.search.brave.com/a2QJ4QGpzGpXeDGHk1c-pL3FdZ-v47YnUIxeu4pjCe4/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9vbHV3/YWRpbXUtYWRlZGVq/aS53ZWIuYXBwL2lt/YWdlcy9sb2dvLnBu/Zw" alt="Comibyte Welcome Page" width="300">
