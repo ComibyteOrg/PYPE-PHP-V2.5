@@ -82,12 +82,14 @@ Pype PHP is a modern, lightweight PHP framework designed for rapid development w
 - PHP 8.0+
 - Composer
 - Web server (Apache/Nginx) or use built-in PHP server
+- git
+- Node Js v25++
 
 ### Getting Started
 
 1. Create Your project Folder & Clone the repository:
    ```bash
-   git clone (https://github.com/ComibyteOrg/PYPE-PHP-V2.5.git)
+   git clone https://github.com/ComibyteOrg/PYPE-PHP-V2.5.git
    ```
 
 2. Move the framework to your project directory:
