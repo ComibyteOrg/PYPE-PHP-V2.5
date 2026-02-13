@@ -115,7 +115,7 @@ Pype PHP is a modern, lightweight PHP framework designed for rapid development w
    # DB_PASS=your_password
    ```
 
-6. Run migrations:
+6. Run migrations (Optional):
    ```bash
    php pype.php migrate
    ```
