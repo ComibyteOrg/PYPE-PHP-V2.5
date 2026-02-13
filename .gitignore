@@ -1,0 +1,107 @@
+# Environment specific files
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.sqlite
+database.sqlite
+database_*.sqlite
+
+# Dependency directories
+vendor/
+
+# Storage and cache
+Storage/logs/
+Storage/cache/
+Storage/sessions/
+Storage/uploads/
+Storage/temp/
+
+# Compiled and cache files
+*.cache
+*.log
+*.tmp
+*.lock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# PHP related
+*.php~
+*.php.bak
+*.phar
+composer.lock
+
+# Build and distribution
+dist/
+build/
+*.min.js
+*.min.css
+
+# Sensitive files
+config/
+secrets/
+keys/
+certs/
+
+# Framework specific
+Framework/Cache/
+Framework/Logs/
+Framework/Sessions/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Ignore all log files
+*.log
+
+# Ignore uploaded files
+public/uploads/
+public/files/
+public/storage/
+
+# Ignore backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Ignore IDE and editor files
+.vs/
+*.sublime-project
+*.sublime-workspace
+nbproject/
+
+# Ignore system files
+System Volume Information/
+$RECYCLE.BIN/
+
+# Ignore migrations backup files
+migrations/*.bak
+migrations/*.backup
+
+# Ignore IDE files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.tmp
