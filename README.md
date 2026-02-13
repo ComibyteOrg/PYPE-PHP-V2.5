@@ -2463,5 +2463,4 @@ MIT License - See LICENSE file for details.
 
 ## Support
 
-For support, please open an issue in the repository or contact the maintainers.#   P Y P E - P H P - V 2 . 5  
- 
+For support, please open an issue in the repository or contact the maintainers.#
