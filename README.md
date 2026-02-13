@@ -1,4 +1,4 @@
-# Pype PHP Framework
+# Pype PHP Framework V2.5 — The Professional PHP Framework By Comibyte
 
 <div align="center">
   <img src="https://imgs.search.brave.com/a2QJ4QGpzGpXeDGHk1c-pL3FdZ-v47YnUIxeu4pjCe4/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9vbHV3/YWRpbXUtYWRlZGVq/aS53ZWIuYXBwL2lt/YWdlcy9sb2dvLnBu/Zw" alt="Comibyte Welcome Page" width="300">
@@ -84,10 +84,9 @@ Pype PHP is a modern, lightweight PHP framework designed for rapid development w
 
 ### Getting Started
 
-1. Clone the repository:
+1. Create Your project Folder & Clone the repository:
    ```bash
-   git clone <repository-url> project-name
-   cd project-name
+   git clone (https://github.com/ComibyteOrg/PYPE-PHP-V2.5.git)
    ```
 
 2. Move the framework to your project directory:
