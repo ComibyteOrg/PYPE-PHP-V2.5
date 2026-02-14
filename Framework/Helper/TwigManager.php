@@ -72,7 +72,6 @@ class TwigManager
                 'csrfInput',
                 'db_path',
                 'upload',
-                'auth',
                 'check',
                 'logout',
                 'flash',
