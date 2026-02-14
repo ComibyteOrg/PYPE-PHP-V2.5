@@ -5,7 +5,7 @@
       "Core\\": "Core/"
     },
     "files": [
-      "App/Helper/functions.php"
+      "Framework/Helper/functions.php"
     ]
   },
   "require": {
