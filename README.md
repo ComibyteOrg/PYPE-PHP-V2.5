@@ -95,7 +95,7 @@ Pype PHP is a modern, lightweight PHP framework designed for rapid development w
 2. Move the framework to your project directory:
    ```bash
    # If downloaded in a subfolder, move contents to project root
-   mv PYPE-PHP-V2/* ./
+   mv PYPE-PHP-V2.5/* ./
    ```
 
 3. Initialize the framework:
