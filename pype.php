@@ -4,12 +4,15 @@
 /**
  * Pype Framework CLI
  * 
- * Version: 1.0.0
+ * Version: 2.5.0
  * Description: Command-line interface for Pype PHP Framework
  */
 
-// Load composer autoloader
-require __DIR__ . '/vendor/autoload.php';
+// Load composer autoloader (only if it exists)
+$autoloadFile = __DIR__ . '/vendor/autoload.php';
+if (file_exists($autoloadFile)) {
+    require $autoloadFile;
+}
 
 class PypeCLI
 {
@@ -310,7 +313,7 @@ class PypeCLI
         // Load environment variables before anything else
         if (file_exists($this->projectRoot . '/vendor/autoload.php')) {
             require_once $this->projectRoot . '/vendor/autoload.php';
-            
+
             if (class_exists('Dotenv\Dotenv')) {
                 try {
                     $dotenv = \Dotenv\Dotenv::createImmutable($this->projectRoot);
