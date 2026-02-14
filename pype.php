@@ -175,6 +175,14 @@ class PypeCLI
             $this->info('  • .gitignore not found');
         }
 
+        $pypephpFolder = $this->projectRoot . '/PYPE-PHP-V2.5';
+        if (is_dir($pypephpFolder)) {
+            $this->removeDirectory($pypephpFolder);
+            $this->success('  ✓ Removed PYPE-PHP-V2.5 folder');
+        } else {
+            $this->info('  • PYPE-PHP-V2.5 folder not found');
+        }
+
         $this->line('');
 
         // Step 4: Copy .env.example to .env
