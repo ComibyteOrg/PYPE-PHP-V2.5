@@ -11,7 +11,11 @@
   </p>
 </div>
 
-Pype PHP is a modern, lightweight PHP framework designed for rapid development with Django-inspired features. It includes built-in ORM, migrations, routing, authentication, and more.
+Pype PHP V2 is a lightweight, expressive, and powerful PHP framework designed for speed and simplicity. It provides a Laravel-like experience with a fluent Query Builder, Twig templating, Social Authentication, and a robust Mailing system.
+
+## Older Version
+### [View Version 1 of Pype PHP Here](https://github.com/ComibyteOrg/Comibyte-PHP-Framework)
+### [View Version 2.0 of Pype PHP Here](https://github.com/ComibyteOrg/PYPE-PHP-V2)
 
 ## Table of Contents
 - [Features](#features)
@@ -79,11 +83,12 @@ Pype PHP is a modern, lightweight PHP framework designed for rapid development w
 ## Installation
 
 ### Prerequisites
-- PHP 8.0+
+- PHP 8.2+
 - Composer
+- Node JS 22.16.0+
+- Git Terminal
 - Web server (Apache/Nginx) or use built-in PHP server
-- git
-- Node Js v25++
+- Extensions: `pdo`, `mbstring`, `openssl`, `curl`. `Twig Language 2`
 
 ### Getting Started
 
@@ -147,6 +152,9 @@ project-root/
 ├── index.php            # Entry point
 └── pype.php             # CLI tool
 ```
+
+
+> [!IMPORTANT] > **Architecture Rule**: Always place your Controllers in `App/Controllers`, Models in `App/Models`, and Middleware in `App/Middleware`. The `Framework/` folder is reserved for the framework is internal mechanics.
 
 ## CLI Commands
 
