@@ -4,7 +4,7 @@
 /**
  * Pype Framework CLI
  * 
- * Version: 1.0.0
+ * Version: 2.5.0
  * Description: Command-line interface for Pype PHP Framework
  */
 
