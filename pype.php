@@ -4,7 +4,7 @@
 /**
  * Pype Framework CLI
  * 
- * Version: 2.5.0
+ * Version: 1.0.0
  * Description: Command-line interface for Pype PHP Framework
  */
 
@@ -820,13 +820,31 @@ EOT;
         // Check if this is a create_*_table migration
         $isCreateTable = strpos($migrationName, 'create_') === 0 && strpos($migrationName, '_table') !== false;
 
+        // Also check if the migration name matches a model name directly
+        $directModelMatch = null;
+        $modelsDir = $this->projectRoot . '/App/Models';
+
+        if (is_dir($modelsDir)) {
+            $files = scandir($modelsDir);
+            foreach ($files as $file) {
+                if (substr($file, -4) === '.php') {
+                    $modelName = substr($file, 0, -4);
+                    // Check if migration name matches model name exactly
+                    if (strtolower($migrationName) === strtolower($modelName)) {
+                        $directModelMatch = $modelName;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $foundModel = null;
+        $tableName = null;
+
+        // If it's a create_*_table pattern, try to match to model
         if ($isCreateTable) {
             // Extract table name from migration name (e.g., create_users_table -> users)
             $tableName = str_replace(['create_', '_table'], '', $migrationName);
-
-            // Try to find corresponding model
-            $modelsDir = $this->projectRoot . '/App/Models';
-            $foundModel = null;
 
             if (is_dir($modelsDir)) {
                 $files = scandir($modelsDir);
@@ -842,25 +860,75 @@ EOT;
                     }
                 }
             }
+        }
+        // If it's a direct model name match
+        elseif ($directModelMatch) {
+            $foundModel = $directModelMatch;
 
-            if ($foundModel) {
-                $template = <<<'EOT'
+            // Get the actual table name from the model
+            $modelPath = $modelsDir . '/' . $directModelMatch . '.php';
+            if (file_exists($modelPath)) {
+                $modelContent = file_get_contents($modelPath);
+
+                // Extract table name from the model file
+                if (preg_match('/protected\s+static\s+\$table\s*=\s*[\'"]([^\'"]+)[\'"]/', $modelContent, $matches)) {
+                    $tableName = $matches[1];
+                } else {
+                    // Default to pluralized model name if no table specified
+                    $tableName = strtolower($directModelMatch) . 's';
+                }
+            }
+        }
+
+        if ($foundModel && $tableName) {
+            // Read the model file to extract the schema method content
+            $modelPath = $modelsDir . '/' . $foundModel . '.php';
+            $schemaMethodContent = "// Unable to extract schema - using default\n            \$table->id();\n            \$table->timestamps();";
+            
+            if (file_exists($modelPath)) {
+                $modelCode = file_get_contents($modelPath);
+                
+                // Extract the schema method content
+                if (preg_match('/public\s+static\s+function\s+schema\([^)]*\)\s*\{(.*)\}/s', $modelCode, $matches)) {
+                    $methodBody = $matches[1];
+                    
+                    // Clean up the method body and convert to proper migration syntax
+                    $lines = explode("\n", $methodBody);
+                    $cleanedLines = [];
+                    
+                    foreach ($lines as $line) {
+                        $trimmedLine = trim($line);
+                        if (!empty($trimmedLine) && $trimmedLine !== '{' && $trimmedLine !== '}') {
+                            // Add proper indentation (4 spaces for the function, plus 12 more for the table calls)
+                            $cleanedLines[] = '            ' . $trimmedLine;
+                        }
+                    }
+                    
+                    $schemaMethodContent = implode("\n", $cleanedLines);
+                    
+                    // If the result is empty or just whitespace, use default
+                    if (trim(str_replace(' ', '', str_replace("\n", '', $schemaMethodContent))) === '') {
+                        $schemaMethodContent = "            \$table->id();\n            \$table->timestamps();";
+                    }
+                }
+            }
+            
+            $template = <<<EOT
 <?php
 
 use Framework\Database\Migration;
 
-class {ClassName} extends Migration
+class {$className} extends Migration
 {
     /**
      * Run the migrations
-     * Using schema from the {ModelName} model
+     * Using schema from the {$foundModel} model
      */
     public function up()
     {
-        // Create {TableName} table based on model schema
-        $this->createTable('{TableName}', function($table) {
-            // Call the model's schema method
-            \App\Models\{ModelName}::schema($table);
+        // Create {$tableName} table based on model schema
+        \$this->createTable('{$tableName}', function(\$table) {
+{$schemaMethodContent}
         });
     }
 
@@ -870,18 +938,12 @@ class {ClassName} extends Migration
     public function down()
     {
         // Drop the table
-        $this->dropTable('{TableName}');
+        \$this->dropTable('{$tableName}');
     }
 }
 EOT;
 
-                $template = str_replace(
-                    ['{ClassName}', '{ModelName}', '{TableName}'],
-                    [$className, $foundModel, $tableName],
-                    $template
-                );
-                return $template;
-            }
+            return $template;
         }
 
         // Default template for other migrations
@@ -978,22 +1040,34 @@ EOT;
         } catch (\Exception $e) {
             // Table doesn't exist, create it
             // Determine database type to use appropriate SQL syntax
-            if ($connect->connection instanceof \PDO) {
-                // This is likely SQLite
-                $createTableSQL = "CREATE TABLE IF NOT EXISTS migrations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    migration TEXT NOT NULL UNIQUE,
-                    batch INTEGER NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )";
-            } elseif ($connect->connection instanceof \mysqli) {
-                // MySQL
+            if ($connect->connection instanceof \mysqli) {
+                // MySQL with mysqli
                 $createTableSQL = "CREATE TABLE IF NOT EXISTS migrations (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     migration VARCHAR(255) NOT NULL UNIQUE,
                     batch INT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )";
+            } elseif ($connect->connection instanceof \PDO) {
+                // Check if it's a MySQL PDO connection by inspecting driver
+                $driver = $connect->connection->getAttribute(\PDO::ATTR_DRIVER_NAME);
+                if ($driver === 'mysql') {
+                    // MySQL with PDO
+                    $createTableSQL = "CREATE TABLE IF NOT EXISTS migrations (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        migration VARCHAR(255) NOT NULL UNIQUE,
+                        batch INT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )";
+                } else {
+                    // Likely SQLite with PDO
+                    $createTableSQL = "CREATE TABLE IF NOT EXISTS migrations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        migration TEXT NOT NULL UNIQUE,
+                        batch INTEGER NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )";
+                }
             } else {
                 // Fallback to SQLite syntax
                 $createTableSQL = "CREATE TABLE IF NOT EXISTS migrations (
