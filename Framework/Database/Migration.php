@@ -27,7 +27,8 @@ abstract class Migration
         } elseif ($this->connection instanceof \SQLite3) {
             return 'sqlite';
         } elseif ($this->connection instanceof \PDO) {
-            return 'pgsql';
+            // Get the actual database driver name from PDO
+            return $this->connection->getAttribute(\PDO::ATTR_DRIVER_NAME);
         }
         return 'unknown';
     }
