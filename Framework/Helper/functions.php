@@ -343,9 +343,13 @@ if (!function_exists('logout')) {
 }
 
 if (!function_exists('flash')) {
-    function flash($key, $message)
+    function flash($key, $message = null)
     {
-        return Helper::flash($key, $message);
+        if ($message === null) {
+            return Helper::getFlash($key);
+        }
+        Helper::flash($key, $message);
+        return null;
     }
 }
 
