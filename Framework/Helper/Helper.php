@@ -555,4 +555,23 @@ class Helper
         unset($_SESSION['flash_' . $key]);
         return $message;
     }
+
+
+
+    public static function isAjax()
+    {
+        return isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    }
+
+
+    public static function json($data, $statusCode = 200)
+    {
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
+
+
 }
