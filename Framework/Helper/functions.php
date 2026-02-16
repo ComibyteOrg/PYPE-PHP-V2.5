@@ -375,3 +375,11 @@ if (!function_exists('env')) {
         return $_ENV[$key] ?? $_SERVER[$key] ?? $default;
     }
 }
+
+
+if (!function_exists('redirectWith')) {
+    function redirectWith($url, $key, $message = null, $seconds = 0)
+    {
+        Helper::redirectWith($url, $key, $message, $seconds);
+    }
+}
