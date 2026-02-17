@@ -225,12 +225,21 @@ class DB extends Connect
         return $this;
     }
 
-    // RAW Queries
+    // RAW Queries (instance method)
     public function raw($sql, $bindValues = [])
     {
         $stmt = $this->connection->prepare($sql);
         $stmt->execute($bindValues);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // RAW Queries (static method for CLI usage)
+    public static function rawQuery($sql, $bindValues = [])
+    {
+        $instance = new static();
+        $stmt = $instance->connection->prepare($sql);
+        $stmt->execute($bindValues);
+        return $stmt;
     }
 
     // WHERE builder
@@ -296,7 +305,7 @@ class DB extends Connect
     }
 
     // Execute query
-    protected function run($sql, $bindValues)
+    protected function run($sql, $bindValues): \PDOStatement
     {
         error_log("DB::run executing SQL: $sql with bind values: " . json_encode($bindValues));
 
@@ -306,8 +315,8 @@ class DB extends Connect
         }
 
         $stmt = $this->connection->prepare($sql);
-        $result = $stmt->execute($bindValues);
-        error_log("DB::run execute result: " . ($result ? 'true' : 'false'));
+        $stmt->execute($bindValues);
+        error_log("DB::run execute result: true");
         return $stmt;
     }    // FETCH ALL
     public function get()
