@@ -803,13 +803,13 @@ class Model extends DatabaseQuery
     }
 
     /**
-     * FIRST - Get first result
+     * FIRST - Get first result as model instance
      */
     public static function getFirst()
     {
         static::limit(1);
         $data = static::get();
-        return $data[0] ?? null;
+        return !empty($data[0]) ? new static($data[0]) : null;
     }
 
     /**
