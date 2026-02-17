@@ -600,4 +600,104 @@ class Helper
     }
 
 
+
+
+    /**
+     * Logout admin user
+     */
+    public static function adminLogout()
+    {
+        unset($_SESSION['admin_id']);
+        if (isset($_COOKIE['admin_remember_me'])) {
+            unset($_COOKIE['admin_remember_me']);
+            setcookie('admin_remember_me', '', time() - 3600, '/');
+        }
+    }
+
+    /**
+     * Check if admin is authenticated
+     * @return bool
+     */
+    public static function adminCheck()
+    {
+        return (bool) static::adminAuth();
+    }
+
+    /**
+     * Get authenticated admin user
+     * @return object|null
+     */
+    public static function adminAuth()
+    {
+        // Return cached user if already fetched during this request
+        if (!empty($_SESSION['admin_auth_user'])) {
+            return (object) $_SESSION['admin_auth_user'];
+        }
+
+        $adminId = $_SESSION['admin_id'] ?? null;
+        $remember = $_COOKIE['admin_remember_me'] ?? null;
+
+        // If we have a session admin id, fetch from admins table
+        if ($adminId) {
+            $admin = DB::table('admins')->find($adminId);
+            if ($admin && is_array($admin)) {
+                $_SESSION['admin_auth_user'] = $admin;
+                return (object) $admin;
+            }
+        }
+
+        // If remember cookie exists, try using it
+        if ($remember) {
+            $admin = DB::table('admins')->where('email', $remember)->where('is_active', 1)->first();
+            if ($admin && is_array($admin)) {
+                $_SESSION['admin_id'] = $admin['id'];
+                $_SESSION['admin_auth_user'] = $admin;
+                return (object) $admin;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Authenticate admin credentials
+     * @param string $email
+     * @param string $password
+     * @return object|null Returns admin object on success, null on failure
+     */
+    public static function adminAuthenticate($email, $password)
+    {
+        $admin = DB::table('admins')->where('email', $email)->where('is_active', 1)->first();
+
+        if ($admin && is_array($admin) && password_verify($password, $admin['password'])) {
+            return (object) $admin;
+        }
+
+        return null;
+    }
+
+    /**
+     * Login admin user
+     * @param object $admin
+     * @param bool $remember
+     * @return bool
+     */
+    public static function adminLogin($admin, $remember = false)
+    {
+        if (!$admin) {
+            return false;
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['admin_id'] = $admin->id;
+        $_SESSION['admin_auth_user'] = (array) $admin;
+
+        if ($remember) {
+            setcookie('admin_remember_me', $admin->email, time() + (30 * 24 * 60 * 60), '/');
+        }
+
+        return true;
+    }
+
+
 }
