@@ -75,6 +75,14 @@ class PypeCLI
                 'callback' => [$this, 'migrateFreshModelCommand'],
                 'description' => 'Drop and re-create a specific model\'s table'
             ],
+            'make:seeder' => [
+                'callback' => [$this, 'makeSeederCommand'],
+                'description' => 'Create a new seeder file'
+            ],
+            'db:seed' => [
+                'callback' => [$this, 'dbSeedCommand'],
+                'description' => 'Run database seeders'
+            ],
             'serve' => [
                 'callback' => [$this, 'serveCommand'],
                 'description' => 'Serve the website locally (default port: 8000)'
@@ -710,6 +718,203 @@ class PypeCLI
             $this->line('');
             $this->success("✅ {$ran} migration(s) executed successfully!");
         }
+    }
+
+    /**
+     * Make Seeder command - Create a new seeder file
+     */
+    private function makeSeederCommand($seederName = null)
+    {
+        if (!$seederName) {
+            $this->error('Seeder name is required!');
+            $this->line('Usage: php pype.php make:seeder <SeederName>');
+            $this->line('Example: php pype.php make:seeder UserSeeder');
+            $this->line('         php pype.php make:seeder DatabaseSeeder');
+            return;
+        }
+
+        $seederDir = $this->projectRoot . '/Database/Seeders';
+        if (!is_dir($seederDir)) {
+            mkdir($seederDir, 0755, true);
+        }
+
+        // Remove "Seeder" suffix if present, then add it back
+        $className = rtrim($seederName, 'Seeder') . 'Seeder';
+        $fileName = $className . '.php';
+        $filePath = $seederDir . '/' . $fileName;
+
+        // Check if file already exists
+        if (file_exists($filePath)) {
+            $this->error("Seeder '{$className}' already exists!");
+            return;
+        }
+
+        $template = $this->getSeederTemplate($className);
+        file_put_contents($filePath, $template);
+
+        $this->line('');
+        $this->success("✓ Seeder created successfully!");
+        $this->line("Path: Database/Seeders/{$fileName}");
+        $this->line('');
+        $this->line('Next steps:');
+        $this->line('  1. Edit the seeder file to define your sample data');
+        $this->line('  2. Run: php pype.php db:seed');
+        $this->line('');
+    }
+
+    /**
+     * Get Seeder template
+     */
+    private function getSeederTemplate($className)
+    {
+        return <<<EOT
+<?php
+
+namespace Database\Seeders;
+
+use Framework\Database\Seeder;
+
+class {$className} extends Seeder
+{
+    /**
+     * Run the database seeds
+     */
+    public function run()
+    {
+        // Example: Insert sample data
+        // \$this->insert('table_name', [
+        //     ['column1' => 'value1', 'column2' => 'value2'],
+        //     ['column1' => 'value3', 'column2' => 'value4'],
+        // ]);
+
+        // Example: Using factory for multiple records
+        // \$this->factory('table_name', 10, function(\$index) {
+        //     return [
+        //         'name' => 'User ' . \$index,
+        //         'email' => 'user' . \$index . '@example.com',
+        //     ];
+        // });
+    }
+}
+EOT;
+    }
+
+    /**
+     * DB Seed command - Run database seeders
+     */
+    private function dbSeedCommand($seederName = null)
+    {
+        $this->line('');
+        $this->info('🌱 Seeding database...');
+        $this->line('');
+
+        // Load environment and required files
+        $this->loadRequiredFiles();
+        require_once $this->projectRoot . '/Framework/Database/Seeder.php';
+        require_once $this->projectRoot . '/Framework/Helper/DB.php';
+
+        $seederDir = $this->projectRoot . '/Database/Seeders';
+
+        if (!is_dir($seederDir)) {
+            $this->warning('⚠ No seeders directory found');
+            $this->line('Create a seeder first: php pype.php make:seeder UserSeeder');
+            return;
+        }
+
+        try {
+            if ($seederName) {
+                // Run specific seeder
+                $seederFile = $seederDir . '/' . $seederName . '.php';
+                if (!file_exists($seederFile)) {
+                    // Try with "Seeder" suffix
+                    $seederFile = $seederDir . '/' . rtrim($seederName, 'Seeder') . 'Seeder.php';
+                }
+
+                if (file_exists($seederFile)) {
+                    $this->line("  Running: " . basename($seederFile));
+                    require_once $seederFile;
+                    
+                    // Get namespace from file
+                    $namespace = $this->getNamespaceFromFile($seederFile);
+                    $className = $this->getClassFromFile($seederFile);
+                    $fullClassName = $namespace ? "\\{$namespace}\\{$className}" : "\\{$className}";
+                    
+                    $this->line("  Namespace: {$namespace}");
+                    $this->line("  Class: {$className}");
+                    $this->line("  Full class: {$fullClassName}");
+                    
+                    if ($className && class_exists($fullClassName)) {
+                        $this->line("  Instantiating {$fullClassName}...");
+                        $seeder = new $fullClassName();
+                        $this->line("  Calling run() method...");
+                        $seeder->run();
+                        $this->success("    ✓ Seeded: {$className}");
+                    } else {
+                        $this->error("  Class '{$fullClassName}' not found!");
+                        $this->line("  Available classes: " . implode(', ', get_declared_classes()));
+                    }
+                } else {
+                    $this->error("Seeder '{$seederName}' not found!");
+                }
+            } else {
+                // Run all seeders
+                $files = glob($seederDir . '/*.php');
+                sort($files);
+
+                if (empty($files)) {
+                    $this->warning('⚠ No seeders found');
+                    $this->line('Create a seeder first: php pype.php make:seeder UserSeeder');
+                    return;
+                }
+
+                $this->line("  Found " . count($files) . " seeder file(s)");
+
+                foreach ($files as $file) {
+                    $fileName = basename($file);
+                    $this->line("  Running: {$fileName}");
+                    require_once $file;
+
+                    // Get namespace from file
+                    $namespace = $this->getNamespaceFromFile($file);
+                    $className = $this->getClassFromFile($file);
+                    $fullClassName = $namespace ? "\\{$namespace}\\{$className}" : "\\{$className}";
+                    
+                    $this->line("    Namespace: {$namespace}");
+                    $this->line("    Class: {$className}");
+                    
+                    if ($className && class_exists($fullClassName)) {
+                        $seeder = new $fullClassName();
+                        $seeder->run();
+                        $this->success("      ✓ Seeded: {$className}");
+                    } else {
+                        $this->error("    ✗ Class '{$fullClassName}' not found!");
+                    }
+                }
+            }
+
+            $this->line('');
+            $this->success('✅ Database seeded successfully!');
+
+        } catch (\Exception $e) {
+            $this->error('❌ Error: ' . $e->getMessage());
+            $this->line('Stack trace: ' . $e->getTraceAsString());
+        }
+
+        $this->line('');
+    }
+
+    /**
+     * Extract namespace from PHP file
+     */
+    private function getNamespaceFromFile($file)
+    {
+        $contents = file_get_contents($file);
+        
+        if (preg_match('/namespace\s+([^;]+);/', $contents, $matches)) {
+            return trim($matches[1]);
+        }
+        
+        return null;
     }
 
     /**
