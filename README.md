@@ -11,48 +11,34 @@
   </p>
 </div>
 
-Pype PHP V2 is a lightweight, expressive, and powerful PHP framework designed for speed and simplicity. It provides a Laravel-like experience with a fluent Query Builder, Twig templating, Social Authentication, and a robust Mailing system.
-
-## Older Version
-### [View Version 1 of Pype PHP Here](https://github.com/ComibyteOrg/Comibyte-PHP-Framework)
-### [View Version 2.0 of Pype PHP Here](https://github.com/ComibyteOrg/PYPE-PHP-V2)
+Pype PHP is a modern, lightweight PHP framework designed for rapid development with Django-inspired features. It includes built-in ORM, migrations, routing, authentication, and more.
 
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)
 - [Project Structure](#project-structure)
 - [CLI Commands](#cli-commands)
+- [Database Seeder](#database-seeder)
+- [Authentication](#authentication)
 - [Routing](#routing)
 - [HTTP Layer](#http-layer)
   - [Controllers](#controllers)
   - [API Resources](#api-resources)
   - [API Response Formatting](#api-response-formatting)
 - [Models & ORM](#models--orm)
+  - [Quick Reference Tables](#quick-reference-tables)
   - [Model-Based ORM (Recommended)](#1-model-based-orm-recommended)
   - [DB Helper (Fluent Query Builder)](#2-db-helper-fluent-query-builder)
-- [Authentication](#authentication)
-  - [Full Authentication System Example](#full-authentication-system-example)
-  - [Social Authentication](#social-authentication)
-  - [Manual Authentication](#manual-authentication)
 - [Migrations](#migrations)
   - [Django-Style Migrations](#django-style-migrations)
   - [Schema Builder Methods](#schema-builder-methods)
   - [Advanced Schema Operations](#advanced-schema-operations)
 - [Logging](#logging)
-  - [Logger Usage](#logger-usage)
-  - [Log Configuration](#log-configuration)
 - [Email](#email)
-  - [Email Service](#email-service)
-  - [Mailer Class (Alternative)](#mailer-class-alternative)
-  - [Email Templates](#email-templates)
-  - [Using Email in Controllers](#using-email-in-controllers)
-  - [Email Configuration Options](#email-configuration-options)
-  - [Supported Email Drivers](#supported-email-drivers)
 - [Helpers](#helpers)
-  - [ApiResponse](#apiresponse)
-  - [Auth](#auth)
-  - [CSRF Protection](#csrf-protection)
-  - [Database Helper (DB)](#database-helper-db)
+- [Middleware](#middleware)
+- [Configuration](#configuration)
+- [Best Practices](#best-practices)
   - [Email Service](#email-service-1)
   - [File Uploader](#file-uploader)
   - [Logger](#logger)
@@ -83,12 +69,11 @@ Pype PHP V2 is a lightweight, expressive, and powerful PHP framework designed fo
 ## Installation
 
 ### Prerequisites
-- PHP 8.2+
+- PHP 8.0+
 - Composer
-- Node JS 22.16.0+
-- Git Terminal
 - Web server (Apache/Nginx) or use built-in PHP server
-- Extensions: `pdo`, `mbstring`, `openssl`, `curl`. `Twig Language 2`
+- git
+- Node Js v25++
 
 ### Getting Started
 
@@ -153,89 +138,139 @@ project-root/
 └── pype.php             # CLI tool
 ```
 
-
-> [!IMPORTANT] > **Architecture Rule**: Always place your Controllers in `App/Controllers`, Models in `App/Models`, and Middleware in `App/Middleware`. The `Framework/` folder is reserved for the framework is internal mechanics.
-
 ## CLI Commands
 
 Pype PHP comes with powerful CLI commands to accelerate development:
 
-### Initialization
+### Project Commands
 ```bash
-php pype.php init
+php pype.php init                    # Initialize new project
+php pype.php serve                   # Start development server
+php pype.php help                    # Show help
 ```
-Initialize a new Pype project with default structure.
 
-### Model Generation
+### Generation Commands
 ```bash
-php pype.php make:model Post
-# or
-php pype.php createmodel Post
+php pype.php make:model Post         # Create model
+php pype.php createcontroller Post   # Create controller
+php pype.php createview home         # Create view
+php pype.php make:migration name     # Create migration
+php pype.php make:seeder User        # Create seeder
 ```
-Create a new model with default schema method.
-
-### Controller Generation
-```bash
-php pype.php createcontroller PostController
-```
-Create a new controller with basic methods.
 
 ### Migration Commands
 ```bash
-php pype.php make:migration create_posts_table
+php pype.php migrate                 # Run pending migrations
+php pype.php migrate:rollback        # Rollback last migration
+php pype.php migrate:fresh           # Drop all & re-migrate
+php pype.php migrate:fresh:model Admin  # Fresh migrate specific model
 ```
-Create a new migration file.
 
+### Seeder Commands
 ```bash
-php pype.php migrate
+php pype.php db:seed                 # Run all seeders
+php pype.php db:seed UserSeeder      # Run specific seeder
 ```
-Run all pending migrations.
 
+## Database Seeder
+
+Seeders populate your database with sample/test data.
+
+### Quick Start
 ```bash
-php pype.php migrate:rollback
+# Create seeder
+php pype.php make:seeder UserSeeder
+
+# Run seeders
+php pype.php db:seed
 ```
-Rollback the last migration batch.
 
+### Seeder Example
+```php
+<?php
+namespace Database\Seeders;
+use Framework\Database\Seeder;
 
-```bash
-php pype.php migrate:fresh:model Admin
-php pype.php migrate:fresh:model User
-php pype.php migrate:fresh:model all  # Same as migrate:fresh
+class UserSeeder extends Seeder
+{
+    public function run()
+    {
+        // Insert single record
+        $this->insert('users', [
+            'name' => 'John',
+            'email' => 'john@example.com',
+            'password' => password_hash('password', PASSWORD_DEFAULT),
+        ]);
+
+        // Factory: Generate 50 users
+        $this->factory('users', 50, fn($i) => [
+            'name' => 'User ' . $i,
+            'email' => 'user' . $i . '@example.com',
+        ]);
+    }
+}
 ```
-Drop and re-create a specific model's table:
 
-Available Commands 
-| Command | Description |
-|---------|-------------|
-| `php pype.php make:migration <name>` | Create a new migration |
-| `php pype.php migrate` | Run pending migrations |
-| `php pype.php migrate:rollback` | Rollback last migration |
-| `php pype.php migrate:fresh` | Drop all tables and re-migrate |
-| `php pype.php migrate:fresh:model <Model>` | Fresh migrate specific model |
-| `php pype.php migrate:fresh:model all` | Same as migrate:fresh |
+### Seeder Methods
+| Method | Description |
+|--------|-------------|
+| `$this->insert($table, $data)` | Insert data |
+| `$this->factory($table, $count, $fn)` | Generate N records |
+| `$this->table($table)` | Get table instance |
+| `$this->truncate($table)` | Clear table |
 
-```bash
-php pype.php migrate:fresh
+## Authentication
+
+Universal authentication - works with **any table** (users, admins, members, etc.).
+
+### Quick Start
+```php
+use Framework\Helper\Auth;
+
+// Login to any table
+$user = Auth::table('users')->login($email, $password);
+$admin = Auth::table('admins')->login($email, $password);
+
+// Check auth
+if (Auth::table('users')->check()) {
+    $user = Auth::table('users')->user();
+}
+
+// Logout
+Auth::table('users')->logout();
 ```
-Drop all tables and re-run all migrations
 
-### View Generation
-```bash
-php pype.php createview home
-```
-Create a new Twig view file.
+### Helper Functions
+```php
+// Default: users table
+Helper::login($email, $password);
+Helper::check();
+Helper::user();
+Helper::logout();
 
-### Development Server
-```bash
-php pype.php serve
+// Custom table
+Helper::login($email, $password, 'admins');
+Helper::check('admins');
 ```
-Start the built-in development server.
 
-### Help
-```bash
-php pype.php help
+### Registration
+```php
+$user = Helper::register([
+    'name' => 'John',
+    'email' => 'john@example.com',
+    'password' => 'secret',
+]);
 ```
-Show available commands and usage.
+
+### Auth Methods
+| Method | Description |
+|--------|-------------|
+| `Auth::table($name)->login($email, $pass)` | Login |
+| `Auth::table($name)->register($data)` | Register |
+| `Auth::table($name)->check()` | Check auth |
+| `Auth::table($name)->user()` | Get user |
+| `Auth::table($name)->logout()` | Logout |
+| `Auth::table($name)->id()` | Get user ID |
 
 ## Routing
 
@@ -360,11 +395,91 @@ Use POST requests to simulate PUT and DELETE methods.
 
 Pype provides two approaches for database operations:
 
+### Quick Reference Tables
+
+#### Model ORM - Static Methods
+| Method | Example | Description |
+|--------|---------|-------------|
+| `all()` | `Post::all()` | Get all records |
+| `find($id)` | `Post::find(1)` | Find by ID |
+| `findBy($col, $val)` | `Post::findBy('email', $e)` | Find by column |
+| `filter($arr)` | `Post::filter(['status' => 1])` | Filter with AND |
+| `first()` | `Post::first()` | Get first record |
+| `count()` | `Post::count()` | Count records |
+| `create($data)` | `Post::create([...])` | Create & save |
+| `updateRecord($id, $data)` | `Post::updateRecord(1, [...])` | Update by ID |
+| `destroy($id)` | `Post::destroy(1)` | Delete by ID |
+| `truncate()` | `Post::truncate()` | Delete all |
+| `raw($sql, $params)` | `Post::raw("SELECT...")` | Raw SQL |
+
+#### Model ORM - Instance Methods
+| Method | Example | Description |
+|--------|---------|-------------|
+| `save()` | `$post->save()` | Insert/Update |
+| `remove()` | `$post->remove()` | Delete instance |
+| `toArray()` | `$post->toArray()` | Convert to array |
+| `toJson()` | `$post->toJson()` | Convert to JSON |
+| `set($key, $val)` | `$post->set('title', 'X')` | Set attribute |
+
+#### Query Builder Methods (Static Chaining)
+| Method | Example | Description |
+|--------|---------|-------------|
+| `where($col, $val)` | `where('status', 1)` | WHERE condition |
+| `orWhere($col, $val)` | `orWhere('type', 'admin')` | OR condition |
+| `whereIn($col, $arr)` | `whereIn('id', [1,2,3])` | WHERE IN |
+| `whereNull($col)` | `whereNull('deleted_at')` | WHERE NULL |
+| `whereLike($col, $val)` | `whereLike('name', '%john%')` | WHERE LIKE |
+| `orderBy($col, $dir)` | `orderBy('created_at', 'DESC')` | Sort results |
+| `groupBy($col)` | `groupBy('category_id')` | GROUP BY |
+| `limit($n)` | `limit(10)` | LIMIT results |
+| `offset($n)` | `offset(20)` | OFFSET results |
+| `join($t, $c1, $op, $c2)` | `join('users', 'id', '=', 'user_id')` | JOIN |
+| `get()` | `->get()` | Execute & get all |
+| `first()` | `->first()` | Get first result |
+| `countRows()` | `->countRows()` | Count results |
+| `pluck($col)` | `pluck('email')` | Get single column |
+| `exists()` | `->exists()` | Check if exists |
+| `sum($col)` | `sum('amount')` | Sum column |
+| `avg($col)` | `avg('rating')` | Average column |
+| `min($col)` | `min('price')` | Minimum value |
+| `max($col)` | `max('price')` | Maximum value |
+
+#### DB Helper Methods
+| Method | Example | Description |
+|--------|---------|-------------|
+| `DB::table($name)` | `DB::table('users')` | Select table |
+| `DB::users()` | `DB::users()` | Shortcut |
+| `insert($data)` | `DB::users()->insert([...])` | Insert record |
+| `update($data, $where)` | `DB::users()->update([...], ['id'=>1])` | Update |
+| `delete($where)` | `DB::users()->delete(['id'=>1])` | Delete |
+| `increment($col, $amt)` | `DB::users()->increment('views')` | Increment |
+| `decrement($col, $amt)` | `DB::users()->decrement('views')` | Decrement |
+| `transaction($fn)` | `DB::table('users')->transaction(fn)` | Transaction |
+
+#### Schema Builder Methods
+| Method | Example | Description |
+|--------|---------|-------------|
+| `id()` | `$table->id()` | Auto-increment ID |
+| `string($name, $len)` | `$table->string('name', 255)` | VARCHAR |
+| `integer($name)` | `$table->integer('count')` | INT |
+| `text($name)` | `$table->text('content')` | TEXT |
+| `boolean($name)` | `$table->boolean('active')` | BOOLEAN |
+| `double($name, $p, $s)` | `$table->double('price', 8, 2)` | DECIMAL |
+| `date($name)` | `$table->date('birth_date')` | DATE |
+| `datetime($name)` | `$table->datetime('created_at')` | DATETIME |
+| `timestamp($name)` | `$table->timestamp('ts')` | TIMESTAMP |
+| `json($name)` | `$table->json('metadata')` | JSON |
+| `nullable()` | `->nullable()` | Allow NULL |
+| `default($val)` | `->default('value')` | Default value |
+| `unique()` | `->unique()` | Unique constraint |
+| `timestamps()` | `$table->timestamps()` | created_at & updated_at |
+| `softDeletes()` | `$table->softDeletes()` | deleted_at |
+
+---
+
 ### 1. Model-Based ORM (Recommended)
-This Django-style approach defines schema in models and uses migrations to execute them.
 
 #### Creating Models
-Use the CLI command:
 ```bash
 php pype.php make:model Post
 ```
@@ -372,569 +487,77 @@ php pype.php make:model Post
 #### Model Structure
 ```php
 <?php
-
 namespace App\Models;
-
 use Framework\Model\Model;
 
 class Post extends Model
 {
     protected static $table = 'posts';
-    protected static $primaryKey = 'id';
-
+    
     public static function schema($table)
     {
         $table->id();
-        $table->string('title', 255);
-        $table->string('slug', 255)->unique();
+        $table->string('title');
         $table->text('content');
-        $table->boolean('published')->default(false);
         $table->timestamps();
-        $table->softDeletes();
     }
 }
 ```
 
-### Two ORM Approaches
-- **DB Helper Class**: Static method-based query builder (Framework\Helper\DB)
-- **Model Base Class**: Extendable model-based ORM (Framework\Model\Model)
-
-## Quick Examples
-
-### Using DB Helper Class
+#### Usage Examples
 ```php
-// Get all records
-DB::users()->get();
+// Create
+Post::create(['title' => 'New', 'content' => 'Content']);
 
-// Find by ID
-DB::users()->find(1);
+// Read
+$posts = Post::all();
+$post = Post::find(1);
+$published = Post::where('published', true)->get();
 
-// Find by ID or throw exception
-DB::users()->findOrFail(1);
+// Update
+Post::updateRecord(1, ['title' => 'Updated']);
 
-// Select specific columns
-DB::users()->select('id, name, email')->get();
+// Delete
+Post::destroy(1);
 
-// WHERE conditions
-DB::users()->where('status', 1)->get();
-DB::users()->where('age', 18, '>=')->get();
-
-// OR conditions
-DB::users()->where('status', 1)->orWhere('status', 2)->get();
-
-// Advanced WHERE conditions
-DB::users()->whereIn('id', [1, 2, 3])->get();
-DB::users()->whereNotIn('status', [0, 3])->get();
-DB::users()->whereBetween('age', 18, 65)->get();
-DB::users()->whereNotBetween('price', 100, 500)->get();
-
-// LIKE queries
-DB::users()->whereLike('email', 'gmail')->get();
-DB::users()->whereNotLike('name', 'test')->get();
-DB::users()->whereStartsWith('username', 'admin')->get();
-DB::users()->whereEndsWith('domain', '.com')->get();
-
-// NULL checks
-DB::users()->whereNull('deleted_at')->get();
-DB::users()->whereNotNull('email')->get();
-
-// JOINS
-DB::users()->join('posts', 'users.id', '=', 'posts.user_id')->get();
-DB::users()->leftJoin('posts', 'users.id', '=', 'posts.user_id')->get();
-DB::users()->rightJoin('posts', 'users.id', '=', 'posts.user_id')->get();
-DB::users()->innerJoin('posts', 'users.id', '=', 'posts.user_id')->get();
-DB::users()->crossJoin('domains')->get();
-
-// GROUPING & AGGREGATION
-DB::users()->groupBy('country')->get();
-DB::users()->groupBy('country')->having('COUNT(*)', '>', 5)->get();
-
-// DISTINCT results
-DB::users()->distinct()->select('country')->get();
-
-// ORDERING & LIMITING
-DB::users()->orderBy('name', 'ASC')->get();
-DB::users()->orderBy('created_at', 'DESC')->limit(10)->get();
-
-// PAGINATION
-DB::users()->paginate(15, 1);  // 15 per page, page 1
-DB::users()->take(10)->skip(20)->get();  // limit 10, offset 20
-
-// AGGREGATION FUNCTIONS
-DB::products()->sum('price');
-DB::products()->avg('rating');
-DB::products()->min('price');
-DB::products()->max('price');
-DB::users()->count();
-DB::users()->exists();
-
-// PLUCK - Get single column as array
-DB::users()->pluck('email');
-
-// ONLY - Select specific columns
-DB::users()->only(['id', 'name', 'email'])->get();
-
-// EXCEPT - Get all except specific columns
-DB::users()->get() | DB::except(['password', 'token']);
-
-// GET SPECIFIC COLUMNS
-DB::users()->distinct()->select('country')->get();
-```
-
-### Using Model Base Class
-```php
-// Define your model
-class User extends Model {}
-class Post extends Model {}
-
-// Get all records
-User::all();
-
-// Find by ID (static method)
-User::find(1);
-
-// Find by ID or throw exception
-User::query()->findOrFail(1);
-
-// Select specific columns using query builder
-User::query()->select('id, name, email')->get();
-
-// WHERE conditions
-User::query()->where('status', 1)->get();
-User::query()->where('age', 18, '>=')->get();
-
-// OR conditions
-User::query()->where('status', 1)->orWhere('status', 2)->get();
-
-// Advanced WHERE conditions
-User::query()->whereIn('id', [1, 2, 3])->get();
-User::query()->whereNotIn('status', [0, 3])->get();
-User::query()->whereBetween('age', 18, 65)->get();
-User::query()->whereNotBetween('price', 100, 500)->get();
-
-// LIKE queries
-User::query()->whereLike('email', 'gmail')->get();
-User::query()->whereNotLike('name', 'test')->get();
-User::query()->whereStartsWith('username', 'admin')->get();
-User::query()->whereEndsWith('domain', '.com')->get();
-
-// NULL checks
-User::query()->whereNull('deleted_at')->get();
-User::query()->whereNotNull('email')->get();
-
-// JOINS
-Post::query()->leftJoin('users', 'posts.user_id', '=', 'users.id')->get();
-User::query()->innerJoin('posts', 'users.id', '=', 'posts.user_id')->get();
-
-// GROUPING & AGGREGATION
-User::query()->groupBy('country')->get();
-User::query()->groupBy('country')->having('COUNT(*)', '>', 5)->get();
-
-// DISTINCT results
-User::query()->distinct()->select('country')->get();
-
-// ORDERING & LIMITING
-User::query()->orderBy('name', 'ASC')->get();
-User::query()->orderBy('created_at', 'DESC')->limit(10)->get();
-
-// PAGINATION
-User::query()->paginate(15, 1);
-User::query()->take(10)->skip(20)->get();
-
-// AGGREGATION FUNCTIONS
-Post::query()->sum('views');
-Post::query()->avg('rating');
-Post::query()->min('price');
-Post::query()->max('price');
-User::query()->countRows();
-
-// PLUCK - Get single column as array
-User::query()->pluck('email');
-
-// ONLY - Select specific columns
-User::query()->only(['id', 'name', 'email'])->get();
-
-// FIND OR CREATE
-User::updateOrCreate(['email' => 'test@example.com'], ['name' => 'John']);
-
-// UPDATE with query builder
-User::query()->where('status', 1)->updateRows(['verified' => 1]);
-
-// INCREMENT/DECREMENT
-User::query()->where('id', 5)->increment('login_count');
-Post::query()->where('status', 'published')->decrement('draft_count');
-
-// CREATE new instance
-$user = new User(['name' => 'John', 'email' => 'john@example.com']);
-$user->save();
-
-// OR use static create
-User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
-
-// DELETE with query builder
-User::query()->where('status', 0)->deleteRows();
-
-// CHUNK process
-User::query()->chunk(100, function($users) {
-    foreach ($users as $user) {
-        // Process batch of 100 users
-    }
-});
-```
-
-## When to Use DB vs Model
-
-### Use DB Helper Class When:
-- Writing quick queries in controllers
-- You don't need a structured model
-- Working with raw table operations  
-- Building ad-hoc reports
-
-**Example:**
-```php
-// In a controller
-$topUsers = DB::users()
-    ->where('status', 1)
-    ->orderBy('score', 'DESC')
+// Query Builder Chain
+$posts = Post::where('status', 1)
+    ->orderBy('created_at', 'DESC')
     ->limit(10)
     ->get();
 ```
 
-### Use Model Class When:
-- Structuring your application with models
-- You want type hints and IDE support
-- Building reusable business logic
-- You need model-specific methods
-- Working with relationships and collections
+### 2. DB Helper (Fluent Query Builder)
 
-**Example:**
+For complex queries or direct database access.
+
 ```php
-// Define a model
-class User extends Model {
-    protected static $table = 'users';
-    
-    public function getActiveUsers() {
-        return $this->where('status', 1)->get();
-    }
-}
+use Framework\Helper\DB;
 
-// Use the model
-$users = User::query()->where('status', 1)->get();
-```
+// Simple query
+$users = DB::users()->where('active', 1)->get();
 
-## Method Reference
-
-### Connection & Selection
-| Method | Description | Example |
-|--------|-------------|---------|
-| `table($name)` | Select table | `DB::table('users')` |
-| `$table()` | Shortcut | `DB::users()` |
-| `select($columns)` | SELECT clause | `.select('id, name')` |
-| `distinct()` | DISTINCT results | `.distinct()->get()` |
-| `debug()` | Enable SQL debugging | `.debug()->get()` |
-
-### WHERE Clauses
-| Method | Description | Example |
-|--------|-------------|---------|
-| `where($col, $val, $op)` | AND condition | `.where('id', 5)` |
-| `orWhere($col, $val, $op)` | OR condition | `.orWhere('id', 5)` |
-| `whereNull($col)` | IS NULL | `.whereNull('deleted_at')` |
-| `whereNotNull($col)` | IS NOT NULL | `.whereNotNull('email')` |
-| `whereIn($col, $arr)` | IN condition | `.whereIn('id', [1,2,3])` |
-| `whereNotIn($col, $arr)` | NOT IN condition | `.whereNotIn('id', [1,2,3])` |
-| `whereBetween($col, $min, $max)` | BETWEEN | `.whereBetween('age', 18, 65)` |
-| `whereNotBetween($col, $min, $max)` | NOT BETWEEN | `.whereNotBetween('age', 18, 65)` |
-| `whereLike($col, $val)` | LIKE %val% | `.whereLike('email', 'gmail')` |
-| `whereNotLike($col, $val)` | NOT LIKE | `.whereNotLike('name', 'test')` |
-| `whereStartsWith($col, $val)` | LIKE val% | `.whereStartsWith('user', 'admin')` |
-| `whereEndsWith($col, $val)` | LIKE %val | `.whereEndsWith('email', '.com')` |
-
-### JOINS
-| Method | Description | Example |
-|--------|-------------|---------|
-| `join($table, $first, $op, $second)` | INNER JOIN | `.join('posts', 'u.id', '=', 'p.user_id')` |
-| `leftJoin($table, $first, $op, $second)` | LEFT JOIN | `.leftJoin('posts', 'u.id', '=', 'p.user_id')` |
-| `rightJoin($table, $first, $op, $second)` | RIGHT JOIN | `.rightJoin('posts', 'u.id', '=', 'p.user_id')` |
-| `innerJoin($table, $first, $op, $second)` | INNER JOIN | `.innerJoin('posts', 'u.id', '=', 'p.user_id')` |
-| `crossJoin($table)` | CROSS JOIN | `.crossJoin('domains')` |
-
-### GROUPING & HAVING
-| Method | Description | Example |
-|--------|-------------|---------|
-| `groupBy($col)` | GROUP BY | `.groupBy('country')` |
-| `having($col, $op, $val)` | HAVING clause | `.having('COUNT(*)', '>', 5)` |
-
-### ORDERING & LIMITING
-| Method | Description | Example |
-|--------|-------------|---------|
-| `orderBy($col, $dir)` | ORDER BY | `.orderBy('name', 'ASC')` |
-| `limit($count)` | LIMIT | `.limit(10)` |
-| `offset($count)` | OFFSET | `.offset(20)` |
-| `take($count)` | Alias for limit | `.take(10)` |
-| `skip($count)` | Alias for offset | `.skip(20)` |
-| `paginate($perPage, $page)` | Pagination | `.paginate(15, 1)` |
-
-### RETRIEVAL
-
-#### DB Helper Class
-| Method | Description | Example |
-|--------|-------------|---------|
-| `get()` | Fetch all results | `DB::users()->get()` |
-| `first()` | Fetch first record | `DB::users()->first()` |
-| `find($id)` | Find by primary key | `DB::users()->find(1)` |
-| `findOrFail($id)` | Find by ID or throw | `DB::users()->findOrFail(1)` |
-| `count()` | Count records | `DB::users()->count()` |
-| `exists()` | Check if exists | `DB::users()->exists()` |
-| `pluck($col)` | Get single column array | `DB::users()->pluck('email')` |
-
-#### Model Class
-| Method | Description | Example |
-|--------|-------------|---------|
-| `all()` | Get all records (static) | `User::all()` |
-| `get()` | Fetch all results (query builder) | `User::query()->get()` |
-| `getFirst()` | Fetch first record | `User::query()->getFirst()` |
-| `first()` | Get first record (static) | `User::first()` |
-| `find($id)` | Find by primary key (static) | `User::find(1)` |
-| `findOrFail($id)` | Find by ID or throw | `User::query()->findOrFail(1)` |
-| `findBy($col, $val)` | Find by column (static) | `User::findBy('email', 'test@ex.com')` |
-| `findByOrFail($col, $val)` | Find by column or throw | `User::query()->findByOrFail('email', 'test@ex.com')` |
-| `countRows()` | Count records | `User::query()->countRows()` |
-| `count()` | Count records (static) | `User::count()` |
-| `exists()` | Check if exists | `User::query()->exists()` |
-| `pluck($col)` | Get single column array | `User::query()->pluck('email')` |
-
-### AGGREGATION
-
-#### DB Helper Class
-| Method | Example |
-|--------|---------|
-| `sum($col)` | `DB::products()->sum('price')` |
-| `avg($col)` | `DB::products()->avg('rating')` |
-| `min($col)` | `DB::products()->min('price')` |
-| `max($col)` | `DB::products()->max('price')` |
-
-#### Model Class
-| Method | Example |
-|--------|---------|
-| `sum($col)` | `Product::query()->sum('price')` |
-| `avg($col)` | `Product::query()->avg('rating')` |
-| `min($col)` | `Product::query()->min('price')` |
-| `max($col)` | `Product::query()->max('price')` |
-
-### COLUMN SELECTION
-| Method | DB Example | Model Example |
-|--------|-------------|---------|
-| `only($cols)` | `DB::users()->only(['id', 'name'])->get()` | `User::query()->only(['id', 'name'])->get()` |
-| `except($cols)` | `DB::users()->except(['password'])` | `User::query()->except(['password'])` |
-| `pluck($col)` | `DB::users()->pluck('email')` | `User::query()->pluck('email')` |
-| `getColumns($col)` | `DB::users()->getColumns('id')` | `User::query()->getColumns('id')` |
-
-### MODIFICATION
-
-#### DB Helper Class
-| Method | Description | Example |
-|--------|-------------|---------|
-| `create($data)` | Insert new record | `DB::users()->create(['name' => 'John'])` |
-| `insert($data)` | Insert record | `DB::users()->insert(['name' => 'John'])` |
-| `update($data, $where)` | Update records | `DB::users()->update(['status' => 1], ['id' => 1])` |
-| `delete($where)` | Delete records | `DB::users()->delete(['id' => 1])` |
-| `increment($col, $amt)` | Increment column | `DB::users()->increment('views', 1)` |
-| `decrement($col, $amt)` | Decrement column | `DB::users()->decrement('stock', 1)` |
-| `updateOrCreate($cond, $vals)` | Update or insert | `DB::users()->updateOrCreate(['email' => 'x@x.com'], ['name' => 'John'])` |
-| `upsert($data, $unique)` | Batch upsert | `DB::users()->upsert($records, ['id'])` |
-
-#### Model Class
-| Method | Description | Example |
-|--------|-------------|---------|
-| `create($data)` | Create new record (static) | `User::create(['name' => 'John'])` |
-| `insert($data)` | Insert record (inherited) | Model::insert(['name' => 'John'])` |
-| `updateRows($data)` | Update via query builder | `User::query()->where('id', 1)->updateRows(['status' => 1])` |
-| `deleteRows()` | Delete via query builder | `User::query()->where('status', 0)->deleteRows()` |
-| `increment($col, $amt)` | Increment column | `User::query()->where('id', 5)->increment('login_count')` |
-| `decrement($col, $amt)` | Decrement column | `User::query()->where('id', 5)->decrement('login_count')` |
-| `updateOrCreate($cond, $vals)` | Update or create (static) | `User::updateOrCreate(['email' => 'x@x.com'], ['name' => 'John'])` |
-| `upsert($data, $unique)` | Batch upsert (static) | `User::upsert($records, ['id'])` |
-| `save()` | Save instance | `$user->save()` |
-| `remove()` | Delete instance | `$user->remove()` |
-
-### BATCH OPERATIONS
-| Method | DB Example | Model Example |
-|--------|-------------|---------|
-| `chunk($size, $callback)` | `DB::users()->chunk(100, function($records) { ... })` | `User::query()->chunk(100, function($records) { ... })` |
-| `paginate($perPage, $page)` | `DB::users()->paginate(15, 1)` | `User::query()->paginate(15, 1)` |
-| `take($limit)` | `DB::users()->take(10)->get()` | `User::query()->take(10)->get()` |
-| `skip($offset)` | `DB::users()->skip(20)->get()` | `User::query()->skip(20)->get()` |
-
-### UTILITIES
-| Method | DB Example | Model Example |
-|--------|-------------|---------|
-| `raw($sql, $bindings)` | `DB::raw('SELECT * FROM users WHERE id > ?', [5])` | `User::raw('SELECT * FROM users WHERE id > ?', [5])` |
-| `transaction($callback)` | `DB::table('users')->transaction(function($db) { ... })` | `User::transaction(function($user) { ... })` |
-| `debug()` | `DB::users()->debug()->get()` | `User::query()->debug()->get()` |
-
-## Advanced Examples
-
-### Complex DB Query
-```php
-DB::users()
-    ->select('users.id, users.name, COUNT(posts.id) as post_count')
-    ->leftJoin('posts', 'users.id', '=', 'posts.user_id')
-    ->where('users.status', 1)
-    ->having('COUNT(posts.id)', '>', 5)
-    ->groupBy('users.id')
-    ->orderBy('post_count', 'DESC')
+// Complex query
+$posts = DB::posts()
+    ->join('users', 'posts.user_id', '=', 'users.id')
+    ->select('posts.*, users.name')
+    ->where('users.active', 1)
+    ->orderBy('posts.created_at', 'DESC')
     ->limit(10)
     ->get();
+
+// Aggregates
+$count = DB::users()->count();
+$total = DB::orders()->sum('amount');
 ```
 
-### Complex Model Query
-```php
-Post::query()
-    ->select('posts.id, posts.title, users.name, COUNT(comments.id) as comment_count')
-    ->leftJoin('users', 'posts.user_id', '=', 'users.id')
-    ->leftJoin('comments', 'posts.id', '=', 'comments.post_id')
-    ->where('posts.status', 'published')
-    ->having('COUNT(comments.id)', '>', 10)
-    ->groupBy('posts.id')
-    ->orderBy('comment_count', 'DESC')
-    ->limit(20)
-    ->get();
+// Raw queries
+$result = DB::table('users')->raw('SELECT * FROM users WHERE active = ?', [1]);
 ```
 
-### Transaction Example - DB
-```php
-DB::table('users')->transaction(function($db) {
-    $db->insert(['name' => 'John', 'email' => 'john@example.com']);
-    $db->insert(['name' => 'Jane', 'email' => 'jane@example.com']);
-});
-```
-
-### Transaction Example - Model
-```php
-User::transaction(function($user) {
-    User::create(['name' => 'John', 'email' => 'john@example.com']);
-    User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
-});
-```
-
-### Batch Processing - DB
-```php
-DB::users()->chunk(500, function($users) {
-    foreach ($users as $user) {
-        // Process each user
-        sendWelcomeEmail($user['email']);
-    }
-});
-```
-
-### Batch Processing - Model
-```php
-User::query()->chunk(500, function($users) {
-    foreach ($users as $user) {
-        // Process each user  
-        sendNotification($user);
-    }
-});
-```
-
-### Conditional Update - DB
-```php
-DB::users()
-    ->where('country', 'USA')
-    ->where('status', 1)
-    ->update(['verified' => 1], ['country' => 'USA', 'status' => 1]);
-```
-
-### Conditional Update - Model
-```php
-User::query()
-    ->where('country', 'USA')
-    ->where('status', 1)
-    ->updateRows(['verified' => 1]);
-```
-
-### Atomic Operations - DB
-```php
-// Increment views for posts
-DB::posts()->where('id', 5)->increment('views', 1);
-
-// Decrement stock for products
-DB::products()->where('id', 10)->decrement('stock', 1);
-```
-
-### Atomic Operations - Model
-```php
-// Increment login count for user
-User::query()->where('id', 5)->increment('login_count');
-
-// Decrement available seats
-Event::query()->where('id', 10)->decrement('available_seats');
-```
-
-### Upsert - DB
-```php
-$records = [
-    ['id' => 1, 'name' => 'John', 'email' => 'john@example.com'],
-    ['id' => 2, 'name' => 'Jane', 'email' => 'jane@example.com'],
-];
-
-DB::users()->upsert($records, ['id']);
-```
-
-### Upsert - Model
-```php
-$records = [
-    ['id' => 1, 'name' => 'John', 'email' => 'john@example.com'],
-    ['id' => 2, 'name' => 'Jane', 'email' => 'jane@example.com'],
-];
-
-User::upsert($records, ['id']);
-```
-
-## Operators
-
-### Comparison Operators
-- `=` - Equal
-- `!=` or `<>` - Not equal
-- `>` - Greater than
-- `>=` - Greater than or equal
-- `<` - Less than
-- `<=` - Less than or equal
-- `LIKE` - Pattern matching
-- `NOT LIKE` - Inverse pattern matching
-- `IN` - In array
-- `NOT IN` - Not in array
-- `BETWEEN` - Between range
-- `NOT BETWEEN` - Not between range
-
-## Important Notes
-
-### DB Helper Class
-- Use for quick queries and raw table operations
-- Static method-based interface
-- Less boilerplate code
-- Good for simple operations
-- All queries auto-reset after execution
-
-### Model Base Class
-- Use for application structure and business logic
-- Supports both static methods (legacy) and instance methods (query builder)
-- Better for type hints and IDE autocompletion
-- Chainable query builder with `Model::query()`
-- Queries reset after execution via `resetQuery()`
-- Can be extended with custom methods
-- Supports model instances with `save()` and `remove()`
-
-### Security
-- All methods use parameterized queries
-- SQL injection is prevented through prepared statements
-- Bind values are properly escaped for the database type
-
-### Database Support
-- MySQL 5.7+
-- PostgreSQL 10+
-- SQLite 3+
-- All query builder methods work across all supported databases
+Both approaches can be used depending on your needs:
+- Use **Model ORM** for structured, schema-defined operations with built-in methods
+- Use **DB Helper** for complex queries, ad-hoc operations, or when you don't need model features
 ```
 
 ## Controllers
@@ -2837,15 +2460,108 @@ use Framework\Helper\XSSProtection;
 $safeContent = XSSProtection::clean($userInput);
 ```
 
-#### Global Functions
-```php
-// In App/Helper/functions.php
+## Global Functions
 
-baseUrl();           // Get base URL
-redirect('/path');   // Redirect to URL
-e('string');        // Escape HTML
-csrf_token();        // Get CSRF token
-csrf_verify($token); // Verify CSRF token
+Helper functions available everywhere without imports.
+
+### Authentication
+| Function | Example | Description |
+|----------|---------|-------------|
+| `auth($table)` | `auth()` | Get auth instance |
+| `login($email, $pass, $table)` | `login($email, $pass)` | Login user |
+| `register($data, $table)` | `register([...])` | Register user |
+| `check($table)` | `check()` | Check if logged in |
+| `user($table)` | `user()` | Get logged-in user |
+| `userId($table)` | `userId()` | Get user ID |
+| `logout($table)` | `logout()` | Logout user |
+| `isAdmin()` | `isAdmin()` | Check if admin |
+| `admin()` | `admin()` | Get admin user |
+| `adminLogout()` | `adminLogout()` | Logout admin |
+
+### Database
+| Function | Example | Description |
+|----------|---------|-------------|
+| `db($table)` | `db('users')` | Get table instance |
+| `table($table)` | `table('posts')` | Alias for db() |
+
+### Request
+| Function | Example | Description |
+|----------|---------|-------------|
+| `request($key)` | `request('name')` | Get input |
+| `post($key)` | `post('email')` | Get POST |
+| `get($key)` | `get('id')` | Get GET |
+| `has($key)` | `has('submit')` | Check has input |
+| `method()` | `method()` | Get HTTP method |
+| `isAjax()` | `isAjax()` | Check AJAX |
+| `getClientIP()` | `getClientIP()` | Get IP |
+| `userAgent()` | `userAgent()` | Get user agent |
+| `referer()` | `referer()` | Get referer |
+
+### Response
+| Function | Example | Description |
+|----------|---------|-------------|
+| `json($data, $code)` | `json([...])` | JSON response |
+| `abort($code, $msg)` | `abort(404)` | Abort with error |
+| `redirect($url)` | `redirect('/home')` | Redirect |
+| `view($name, $data)` | `view('home')` | Render view |
+
+### Utility
+| Function | Example | Description |
+|----------|---------|-------------|
+| `now()` | `now()` | Current datetime |
+| `today()` | `today()` | Current date |
+| `strRandom($len)` | `strRandom(16)` | Random string |
+| `hashPassword($pass)` | `hashPassword('x')` | Hash password |
+| `verifyPassword($pass, $hash)` | `verifyPassword(...)` | Verify password |
+| `sanitize($input)` | `sanitize($_POST)` | Sanitize input |
+| `dd(...$args)` | `dd($var)` | Dump and die |
+| `env($key)` | `env('APP_URL')` | Get env var |
+| `asset($path)` | `asset('css/app.css')` | Asset URL |
+| `url($path)` | `url('posts/1')` | Generate URL |
+| `slugify($str)` | `slugify('Hello World')` | Make slug |
+| `session($key)` | `session('user')` | Get session |
+| `old($key)` | `old('email')` | Get old input |
+| `flash($key, $msg)` | `flash('success', 'OK')` | Flash message |
+| `csrf_token()` | `csrf_token()` | Get CSRF token |
+| `csrf_field()` | `csrf_field()` | CSRF input field |
+
+### Model
+| Function | Example | Description |
+|----------|---------|-------------|
+| `model($name)` | `model('User')` | Get model instance |
+
+### Example Usage
+```php
+// In controller or view
+if (!check()) {
+    abort(403, 'Unauthorized');
+}
+
+$user = user();
+echo "Welcome, " . $user->name;
+
+// Login
+$authenticated = login($email, $password);
+if ($authenticated) {
+    redirect('/dashboard');
+}
+
+// Database
+$users = db('users')->where('active', 1)->get();
+
+// Request
+$name = request('name');
+if (has('submit')) {
+    // Process form
+}
+
+// Response
+json(['success' => true]);
+
+// Utility
+$token = strRandom(32);
+$hashed = hashPassword($password);
+redirect(url('posts/' . $id));
 ```
 
 ## Configuration
