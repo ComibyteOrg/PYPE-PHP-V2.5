@@ -4,7 +4,7 @@
 /**
  * Pype Framework CLI
  * 
- * Version: 2.5.0
+ * Version: 1.0.0
  * Description: Command-line interface for Pype PHP Framework
  */
 
@@ -66,6 +66,14 @@ class PypeCLI
             'migrate:rollback' => [
                 'callback' => [$this, 'migrateRollbackCommand'],
                 'description' => 'Rollback the last migration'
+            ],
+            'migrate:fresh' => [
+                'callback' => [$this, 'migrateFreshCommand'],
+                'description' => 'Drop all tables and re-run all migrations'
+            ],
+            'migrate:fresh:model' => [
+                'callback' => [$this, 'migrateFreshModelCommand'],
+                'description' => 'Drop and re-create a specific model\'s table'
             ],
             'serve' => [
                 'callback' => [$this, 'serveCommand'],
@@ -439,6 +447,269 @@ class PypeCLI
         }
 
         $this->line('');
+    }
+
+    /**
+     * Migrate Fresh command - Drop all tables and re-run all migrations
+     */
+    private function migrateFreshCommand()
+    {
+        $this->line('');
+        $this->warning('⚠  DROPPING ALL TABLES - This action cannot be undone!');
+        $this->line('');
+        
+        // Confirm before proceeding
+        $this->line('Are you sure you want to drop all tables? (y/n): ');
+        $handle = fopen("php://stdin", "r");
+        $line = fgets($handle);
+        fclose($handle);
+        
+        if (trim(strtolower($line)) !== 'y') {
+            $this->info('Migration fresh cancelled.');
+            return;
+        }
+
+        $this->line('');
+        $this->info('🔄 Fresh migrating all tables...');
+        $this->line('');
+
+        // Load environment and required files
+        $this->loadRequiredFiles();
+
+        try {
+            // Get all tables and drop them (except migrations table)
+            $this->dropAllTables();
+            $this->success('  ✓ All tables dropped');
+            
+            // Clear migrations table
+            $this->clearMigrationsTable();
+            $this->success('  ✓ Migrations table cleared');
+            
+            // Re-run all migrations
+            $this->line('');
+            $this->runAllMigrations();
+            
+        } catch (\Exception $e) {
+            $this->error('❌ Error: ' . $e->getMessage());
+        }
+        
+        $this->line('');
+    }
+
+    /**
+     * Migrate Fresh Model command - Drop and re-create a specific model's table
+     */
+    private function migrateFreshModelCommand($modelName = null)
+    {
+        if (!$modelName) {
+            $this->error('Model name is required!');
+            $this->line('Usage: php pype.php migrate:fresh:model <ModelName>');
+            $this->line('Example: php pype.php migrate:fresh:model Admin');
+            $this->line('         php pype.php migrate:fresh:model all');
+            return;
+        }
+
+        $this->line('');
+        $this->info("🔄 Fresh migrating model: {$modelName}...");
+        $this->line('');
+
+        // Load environment and required files
+        $this->loadRequiredFiles();
+
+        try {
+            if (strtolower($modelName) === 'all') {
+                // Fresh migrate all models
+                $this->dropAllTables();
+                $this->clearMigrationsTable();
+                $this->line('');
+                $this->runAllMigrations();
+            } else {
+                // Find the model and get its table name
+                $modelsDir = $this->projectRoot . '/App/Models';
+                $modelPath = $modelsDir . '/' . $modelName . '.php';
+                
+                if (!file_exists($modelPath)) {
+                    $this->error("Model '{$modelName}' not found!");
+                    return;
+                }
+
+                // Get table name from model
+                $modelContent = file_get_contents($modelPath);
+                $tableName = null;
+                
+                if (preg_match('/protected\s+static\s+\$table\s*=\s*[\'"]([^\'"]+)[\'"]/', $modelContent, $matches)) {
+                    $tableName = $matches[1];
+                } else {
+                    $tableName = strtolower($modelName) . 's';
+                }
+
+                // Find and run the migration for this model
+                $migrationDir = $this->projectRoot . '/migrations';
+                $files = glob($migrationDir . '/*.php');
+                
+                $foundMigration = false;
+                foreach ($files as $file) {
+                    $content = file_get_contents($file);
+                    if (strpos($content, "'{$tableName}'") !== false || strpos($content, "\"{$tableName}\"") !== false) {
+                        $fileName = basename($file);
+                        
+                        // Check if already migrated
+                        $migratedFiles = $this->getMigratedFiles();
+                        if (in_array($fileName, $migratedFiles)) {
+                            // Rollback this migration first
+                            $this->line("  Rolling back: {$fileName}");
+                            include_once $file;
+                            $className = $this->getClassFromFile($file);
+                            if ($className && class_exists($className)) {
+                                $migration = new $className();
+                                $migration->down();
+                                $this->removeMigration($fileName);
+                                $this->success("    ✓ Rolled back: {$fileName}");
+                            }
+                        }
+                        
+                        // Run the migration again
+                        $this->line("  Running: {$fileName}");
+                        include_once $file;
+                        $className = $this->getClassFromFile($file);
+                        if ($className && class_exists($className)) {
+                            $migration = new $className();
+                            $migration->up();
+                            $this->recordMigration($fileName);
+                            $this->success("    ✓ Migrated: {$fileName}");
+                        }
+                        
+                        $foundMigration = true;
+                        break;
+                    }
+                }
+                
+                if (!$foundMigration) {
+                    $this->warning("⚠ No migration found for model '{$modelName}'");
+                    $this->line('Creating new migration...');
+                    $this->createMigration(strtolower($modelName));
+                }
+            }
+            
+        } catch (\Exception $e) {
+            $this->error('❌ Error: ' . $e->getMessage());
+        }
+        
+        $this->line('');
+        $this->success('✅ Model migration completed!');
+        $this->line('');
+    }
+
+    /**
+     * Load required files for migration operations
+     */
+    private function loadRequiredFiles()
+    {
+        if (file_exists($this->projectRoot . '/vendor/autoload.php')) {
+            require_once $this->projectRoot . '/vendor/autoload.php';
+
+            if (class_exists('Dotenv\Dotenv')) {
+                try {
+                    $dotenv = \Dotenv\Dotenv::createImmutable($this->projectRoot);
+                    $dotenv->load();
+                } catch (\Exception $e) {
+                    // Continue without dotenv if it fails
+                }
+            }
+        }
+
+        require_once $this->projectRoot . '/Framework/Database/DatabaseInterface.php';
+        require_once $this->projectRoot . '/Framework/Database/MySQLConnection.php';
+        require_once $this->projectRoot . '/Framework/Database/PostgreSQLConnection.php';
+        require_once $this->projectRoot . '/Framework/Database/SQLiteConnection.php';
+        require_once $this->projectRoot . '/Framework/Database/DatabaseFactory.php';
+        require_once $this->projectRoot . '/Framework/Database/Connect.php';
+        require_once $this->projectRoot . '/Framework/Database/DatabaseQuery.php';
+        require_once $this->projectRoot . '/Framework/Database/Migration.php';
+        require_once $this->projectRoot . '/Framework/Model/Model.php';
+        require_once $this->projectRoot . '/Framework/Helper/DB.php';
+    }
+
+    /**
+     * Drop all tables except migrations table
+     */
+    private function dropAllTables()
+    {
+        $dbType = $_ENV['DB_TYPE'] ?? $_SERVER['DB_TYPE'] ?? 'mysql';
+
+        if ($dbType === 'sqlite') {
+            // SQLite: Get all tables
+            $result = \Framework\Helper\DB::rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations'");
+            $tables = $result->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($tables as $table) {
+                \Framework\Helper\DB::rawQuery("DROP TABLE IF EXISTS {$table}");
+                $this->success("    ✓ Dropped table: {$table}");
+            }
+        } else {
+            // MySQL/PostgreSQL: Get all tables
+            $result = \Framework\Helper\DB::rawQuery("SHOW TABLES");
+            $tables = $result->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($tables as $table) {
+                if ($table !== 'migrations') {
+                    \Framework\Helper\DB::rawQuery("DROP TABLE IF EXISTS {$table}");
+                    $this->success("    ✓ Dropped table: {$table}");
+                }
+            }
+        }
+    }
+
+    /**
+     * Clear migrations table
+     */
+    private function clearMigrationsTable()
+    {
+        \Framework\Helper\DB::rawQuery("DELETE FROM migrations");
+    }
+
+    /**
+     * Run all migrations from scratch
+     */
+    private function runAllMigrations()
+    {
+        $this->ensureMigrationsTable();
+
+        $migrationDir = $this->projectRoot . '/migrations';
+        if (!is_dir($migrationDir)) {
+            $this->warning('⚠ No migrations folder found');
+            return;
+        }
+
+        $files = glob($migrationDir . '/*.php');
+        sort($files);
+
+        $ran = 0;
+        foreach ($files as $file) {
+            $fileName = basename($file);
+            try {
+                $this->line("  Running: {$fileName}");
+                include_once $file;
+
+                $className = $this->getClassFromFile($file);
+
+                if ($className && class_exists($className)) {
+                    $migration = new $className();
+                    $migration->up();
+
+                    $this->recordMigration($fileName);
+                    $this->success("    ✓ Migrated: {$fileName}");
+                    $ran++;
+                }
+            } catch (\Exception $e) {
+                $this->error("    ✗ Error: " . $e->getMessage());
+            }
+        }
+
+        if ($ran === 0) {
+            $this->info('✓ Nothing to migrate');
+        } else {
+            $this->line('');
+            $this->success("✅ {$ran} migration(s) executed successfully!");
+        }
     }
 
     /**
