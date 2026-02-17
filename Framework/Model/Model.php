@@ -35,18 +35,18 @@ class Model extends DatabaseQuery
     protected $data = [];
 
     /**
-     * Query builder properties (instance-based for chaining)
+     * Query builder properties (static for fluent static chaining)
      */
-    protected $querySelect = '*';
-    protected $queryJoins = [];
-    protected $queryWhere = [];
-    protected $queryHaving = '';
-    protected $queryHavingValues = [];
-    protected $queryOrder = '';
-    protected $queryGroup = '';
-    protected $queryLimit = '';
-    protected $queryOffset = '';
-    protected $queryDebug = false;
+    protected static $querySelect = '*';
+    protected static $queryJoins = [];
+    protected static $queryWhere = [];
+    protected static $queryHaving = '';
+    protected static $queryHavingValues = [];
+    protected static $queryOrder = '';
+    protected static $queryGroup = '';
+    protected static $queryLimit = '';
+    protected static $queryOffset = '';
+    protected static $queryDebug = false;
 
     /**
      * Constructor
@@ -197,6 +197,10 @@ class Model extends DatabaseQuery
      */
     public static function first()
     {
+        // If query builder has conditions, use getFirst()
+        if (!empty(static::$queryWhere) || static::$querySelect !== '*' || static::$queryOrder !== '' || static::$queryLimit !== '') {
+            return static::getFirst();
+        }
         $records = static::all();
         return !empty($records) ? $records[0] : null;
     }
@@ -207,6 +211,10 @@ class Model extends DatabaseQuery
      */
     public static function count()
     {
+        // If query builder has conditions, use countRows()
+        if (!empty(static::$queryWhere) || static::$querySelect !== '*' || static::$queryOrder !== '' || static::$queryLimit !== '') {
+            return static::countRows();
+        }
         $instance = new static();
         $result = $instance->select(static::getTable(), "COUNT(*) as count");
 
@@ -406,269 +414,269 @@ class Model extends DatabaseQuery
     /**
      * Enable debug mode
      */
-    public function debug()
+    public static function debug()
     {
-        $this->queryDebug = true;
-        return $this;
+        static::$queryDebug = true;
+        return new static();
     }
 
     /**
      * COLUMNS - Specify columns to select
      */
-    public function columns($columns)
+    public static function columns($columns)
     {
-        $this->querySelect = $columns;
-        return $this;
+        static::$querySelect = $columns;
+        return new static();
     }
 
     /**
      * WHERE - AND condition
      */
-    public function where($column, $value, $operator = '=')
+    public static function where($column, $value, $operator = '=')
     {
-        $this->queryWhere[] = ['AND', $column, $operator, $value];
-        return $this;
+        static::$queryWhere[] = ['AND', $column, $operator, $value];
+        return new static();
     }
 
     /**
      * OR WHERE - OR condition
      */
-    public function orWhere($column, $value, $operator = '=')
+    public static function orWhere($column, $value, $operator = '=')
     {
-        $this->queryWhere[] = ['OR', $column, $operator, $value];
-        return $this;
+        static::$queryWhere[] = ['OR', $column, $operator, $value];
+        return new static();
     }
 
     /**
      * WHERE NULL
      */
-    public function whereNull($column)
+    public static function whereNull($column)
     {
-        $this->queryWhere[] = ['AND', "$column IS NULL"];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column IS NULL"];
+        return new static();
     }
 
     /**
      * WHERE NOT NULL
      */
-    public function whereNotNull($column)
+    public static function whereNotNull($column)
     {
-        $this->queryWhere[] = ['AND', "$column IS NOT NULL"];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column IS NOT NULL"];
+        return new static();
     }
 
     /**
      * WHERE IN - Check if column in array
      */
-    public function whereIn($column, array $values)
+    public static function whereIn($column, array $values)
     {
         $placeholders = implode(',', array_fill(0, count($values), '?'));
-        $this->queryWhere[] = ['AND', "$column IN ($placeholders)", 'IN', $values];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column IN ($placeholders)", 'IN', $values];
+        return new static();
     }
 
     /**
      * WHERE NOT IN
      */
-    public function whereNotIn($column, array $values)
+    public static function whereNotIn($column, array $values)
     {
         $placeholders = implode(',', array_fill(0, count($values), '?'));
-        $this->queryWhere[] = ['AND', "$column NOT IN ($placeholders)", 'NOT IN', $values];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column NOT IN ($placeholders)", 'NOT IN', $values];
+        return new static();
     }
 
     /**
      * WHERE BETWEEN
      */
-    public function whereBetween($column, $min, $max)
+    public static function whereBetween($column, $min, $max)
     {
-        $this->queryWhere[] = ['AND', "$column BETWEEN ? AND ?", 'BETWEEN', [$min, $max]];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column BETWEEN ? AND ?", 'BETWEEN', [$min, $max]];
+        return new static();
     }
 
     /**
      * WHERE NOT BETWEEN
      */
-    public function whereNotBetween($column, $min, $max)
+    public static function whereNotBetween($column, $min, $max)
     {
-        $this->queryWhere[] = ['AND', "$column NOT BETWEEN ? AND ?", 'NOT BETWEEN', [$min, $max]];
-        return $this;
+        static::$queryWhere[] = ['AND', "$column NOT BETWEEN ? AND ?", 'NOT BETWEEN', [$min, $max]];
+        return new static();
     }
 
     /**
      * WHERE LIKE - Pattern matching
      */
-    public function whereLike($column, $value)
+    public static function whereLike($column, $value)
     {
-        $this->queryWhere[] = ['AND', $column, 'LIKE', "%$value%"];
-        return $this;
+        static::$queryWhere[] = ['AND', $column, 'LIKE', "%$value%"];
+        return new static();
     }
 
     /**
      * WHERE NOT LIKE
      */
-    public function whereNotLike($column, $value)
+    public static function whereNotLike($column, $value)
     {
-        $this->queryWhere[] = ['AND', $column, 'NOT LIKE', "%$value%"];
-        return $this;
+        static::$queryWhere[] = ['AND', $column, 'NOT LIKE', "%$value%"];
+        return new static();
     }
 
     /**
      * WHERE STARTS WITH
      */
-    public function whereStartsWith($column, $value)
+    public static function whereStartsWith($column, $value)
     {
-        $this->queryWhere[] = ['AND', $column, 'LIKE', "$value%"];
-        return $this;
+        static::$queryWhere[] = ['AND', $column, 'LIKE', "$value%"];
+        return new static();
     }
 
     /**
      * WHERE ENDS WITH
      */
-    public function whereEndsWith($column, $value)
+    public static function whereEndsWith($column, $value)
     {
-        $this->queryWhere[] = ['AND', $column, 'LIKE', "%$value"];
-        return $this;
+        static::$queryWhere[] = ['AND', $column, 'LIKE', "%$value"];
+        return new static();
     }
 
     /**
      * ORDER BY - Sort results
      */
-    public function orderBy($column, $direction = 'ASC')
+    public static function orderBy($column, $direction = 'ASC')
     {
-        $this->queryOrder = " ORDER BY $column " . strtoupper($direction) . " ";
-        return $this;
+        static::$queryOrder = " ORDER BY $column " . strtoupper($direction) . " ";
+        return new static();
     }
 
     /**
      * GROUP BY - Group results
      */
-    public function groupBy($column)
+    public static function groupBy($column)
     {
-        $this->queryGroup = " GROUP BY $column ";
-        return $this;
+        static::$queryGroup = " GROUP BY $column ";
+        return new static();
     }
 
     /**
      * HAVING - Conditions on grouped results
      */
-    public function having($column, $operator, $value)
+    public static function having($column, $operator, $value)
     {
         $operator = strtoupper($operator);
-        $this->queryHaving .= ($this->queryHaving ? ' AND ' : ' HAVING ') . "$column $operator ?";
-        $this->queryHavingValues[] = $value;
-        return $this;
+        static::$queryHaving .= (static::$queryHaving ? ' AND ' : ' HAVING ') . "$column $operator ?";
+        static::$queryHavingValues[] = $value;
+        return new static();
     }
 
     /**
      * LIMIT - Limit number of results
      */
-    public function limit($limit)
+    public static function limit($limit)
     {
-        $this->queryLimit = " LIMIT $limit ";
-        return $this;
+        static::$queryLimit = " LIMIT $limit ";
+        return new static();
     }
 
     /**
      * OFFSET - Skip number of results
      */
-    public function offset($offset)
+    public static function offset($offset)
     {
-        $this->queryOffset = " OFFSET $offset ";
-        return $this;
+        static::$queryOffset = " OFFSET $offset ";
+        return new static();
     }
 
     /**
      * TAKE - Alias for limit
      */
-    public function take($limit)
+    public static function take($limit)
     {
-        return $this->limit($limit);
+        return static::limit($limit);
     }
 
     /**
      * SKIP - Alias for offset
      */
-    public function skip($offset)
+    public static function skip($offset)
     {
-        return $this->offset($offset);
+        return static::offset($offset);
     }
 
     /**
      * JOIN - Inner join
      */
-    public function join($table, $first, $operator, $second)
+    public static function join($table, $first, $operator, $second)
     {
-        $this->queryJoins[] = " JOIN $table ON $first $operator $second ";
-        return $this;
+        static::$queryJoins[] = " JOIN $table ON $first $operator $second ";
+        return new static();
     }
 
     /**
      * LEFT JOIN
      */
-    public function leftJoin($table, $first, $operator, $second)
+    public static function leftJoin($table, $first, $operator, $second)
     {
-        $this->queryJoins[] = " LEFT JOIN $table ON $first $operator $second ";
-        return $this;
+        static::$queryJoins[] = " LEFT JOIN $table ON $first $operator $second ";
+        return new static();
     }
 
     /**
      * RIGHT JOIN
      */
-    public function rightJoin($table, $first, $operator, $second)
+    public static function rightJoin($table, $first, $operator, $second)
     {
-        $this->queryJoins[] = " RIGHT JOIN $table ON $first $operator $second ";
-        return $this;
+        static::$queryJoins[] = " RIGHT JOIN $table ON $first $operator $second ";
+        return new static();
     }
 
     /**
      * INNER JOIN
      */
-    public function innerJoin($table, $first, $operator, $second)
+    public static function innerJoin($table, $first, $operator, $second)
     {
-        $this->queryJoins[] = " INNER JOIN $table ON $first $operator $second ";
-        return $this;
+        static::$queryJoins[] = " INNER JOIN $table ON $first $operator $second ";
+        return new static();
     }
 
     /**
      * CROSS JOIN
      */
-    public function crossJoin($table)
+    public static function crossJoin($table)
     {
-        $this->queryJoins[] = " CROSS JOIN $table ";
-        return $this;
+        static::$queryJoins[] = " CROSS JOIN $table ";
+        return new static();
     }
 
     /**
      * DISTINCT - Get distinct/unique results
      */
-    public function distinct()
+    public static function distinct()
     {
-        if ($this->querySelect === '*') {
-            $this->querySelect = 'DISTINCT *';
+        if (static::$querySelect === '*') {
+            static::$querySelect = 'DISTINCT *';
         } else {
-            $this->querySelect = 'DISTINCT ' . $this->querySelect;
+            static::$querySelect = 'DISTINCT ' . static::$querySelect;
         }
-        return $this;
+        return new static();
     }
 
     /**
      * ONLY - Select specific columns
      */
-    public function only($columns)
+    public static function only($columns)
     {
         $cols = is_array($columns) ? implode(', ', $columns) : $columns;
-        return $this->columns($cols);
+        return static::columns($cols);
     }
 
     /**
      * EXCEPT - Exclude specific columns from result
      */
-    public function except($columns, $data = null)
+    public static function except($columns, $data = null)
     {
         $excludedColumns = is_array($columns) ? $columns : [$columns];
         if ($data === null) {
-            $data = $this->get();
+            $data = static::get();
         }
 
         if (is_array($data) && count($data) > 0 && is_array($data[0])) {
@@ -685,15 +693,15 @@ class Model extends DatabaseQuery
     /**
      * Build WHERE clause for query
      */
-    protected function buildWhere(&$bindValues)
+    protected static function buildWhere(&$bindValues)
     {
-        if (empty($this->queryWhere))
+        if (empty(static::$queryWhere))
             return '';
 
         $sql = " WHERE ";
         $conditions = [];
 
-        foreach ($this->queryWhere as $index => $w) {
+        foreach (static::$queryWhere as $index => $w) {
             $condition = '';
             if (count($w) == 2) { // NULL
                 $condition = "{$w[0]} {$w[1]}";
@@ -725,26 +733,26 @@ class Model extends DatabaseQuery
     /**
      * Build complete query
      */
-    protected function buildQuery(&$bindValues)
+    protected static function buildQuery(&$bindValues)
     {
         $table = static::getTable();
-        $where = $this->buildWhere($bindValues);
-        $joins = implode('', $this->queryJoins);
+        $where = static::buildWhere($bindValues);
+        $joins = implode('', static::$queryJoins);
 
         $having = '';
-        if (!empty($this->queryHaving)) {
-            $having = $this->queryHaving;
-            $bindValues = array_merge($bindValues, $this->queryHavingValues);
+        if (!empty(static::$queryHaving)) {
+            $having = static::$queryHaving;
+            $bindValues = array_merge($bindValues, static::$queryHavingValues);
         }
 
-        $sql = "SELECT " . $this->querySelect . " FROM " . $table . " "
+        $sql = "SELECT " . static::$querySelect . " FROM " . $table . " "
             . $joins . " "
             . $where . " "
-            . $this->queryGroup
+            . static::$queryGroup
             . $having
-            . $this->queryOrder
-            . $this->queryLimit
-            . $this->queryOffset;
+            . static::$queryOrder
+            . static::$queryLimit
+            . static::$queryOffset;
 
         return $sql;
     }
@@ -752,14 +760,14 @@ class Model extends DatabaseQuery
     /**
      * Execute query
      */
-    protected function executeQuery($sql, $bindValues)
+    protected static function executeQuery($sql, $bindValues)
     {
-        if ($this->queryDebug) {
+        if (static::$queryDebug) {
             echo "SQL: $sql\n";
             print_r($bindValues);
         }
 
-        $stmt = $this->connection->prepare($sql);
+        $stmt = static::getStaticConnection()->prepare($sql);
         $result = $stmt->execute($bindValues);
         return $stmt;
     }
@@ -767,126 +775,126 @@ class Model extends DatabaseQuery
     /**
      * Reset query builder
      */
-    protected function resetQuery()
+    protected static function resetQuery()
     {
-        $this->querySelect = '*';
-        $this->queryJoins = [];
-        $this->queryWhere = [];
-        $this->queryHaving = '';
-        $this->queryHavingValues = [];
-        $this->queryOrder = '';
-        $this->queryGroup = '';
-        $this->queryLimit = '';
-        $this->queryOffset = '';
-        $this->queryDebug = false;
+        static::$querySelect = '*';
+        static::$queryJoins = [];
+        static::$queryWhere = [];
+        static::$queryHaving = '';
+        static::$queryHavingValues = [];
+        static::$queryOrder = '';
+        static::$queryGroup = '';
+        static::$queryLimit = '';
+        static::$queryOffset = '';
+        static::$queryDebug = false;
     }
 
     /**
      * GET - Fetch all results
      */
-    public function get()
+    public static function get()
     {
         $bindValues = [];
-        $sql = $this->buildQuery($bindValues);
-        $stmt = $this->executeQuery($sql, $bindValues);
+        $sql = static::buildQuery($bindValues);
+        $stmt = static::executeQuery($sql, $bindValues);
         $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        $this->resetQuery();
+        static::resetQuery();
         return $data;
     }
 
     /**
      * FIRST - Get first result
      */
-    public function getFirst()
+    public static function getFirst()
     {
-        $this->limit(1);
-        $data = $this->get();
+        static::limit(1);
+        $data = static::get();
         return $data[0] ?? null;
     }
 
     /**
      * PLUCK - Get single column as array
      */
-    public function pluck($column)
+    public static function pluck($column)
     {
-        $this->querySelect = $column;
-        $data = $this->get();
+        static::$querySelect = $column;
+        $data = static::get();
         return array_column($data, $column);
     }
 
     /**
      * GET COLUMNS - Alias for pluck
      */
-    public function getColumns($column)
+    public static function getColumns($column)
     {
-        return $this->pluck($column);
+        return static::pluck($column);
     }
 
     /**
      * EXISTS - Check if any records match
      */
-    public function exists()
+    public static function exists()
     {
-        $data = $this->get();
+        $data = static::get();
         return count($data) > 0;
     }
 
     /**
      * SUM - Sum a column
      */
-    public function sum($column)
+    public static function sum($column)
     {
-        $this->querySelect = "SUM($column) as total";
-        $result = $this->getFirst();
+        static::$querySelect = "SUM($column) as total";
+        $result = static::getFirst();
         return $result['total'] ?? 0;
     }
 
     /**
      * AVG - Average of a column
      */
-    public function avg($column)
+    public static function avg($column)
     {
-        $this->querySelect = "AVG($column) as avg";
-        $result = $this->getFirst();
+        static::$querySelect = "AVG($column) as avg";
+        $result = static::getFirst();
         return $result['avg'] ?? 0;
     }
 
     /**
      * MIN - Minimum value
      */
-    public function min($column)
+    public static function min($column)
     {
-        $this->querySelect = "MIN($column) as min";
-        $result = $this->getFirst();
+        static::$querySelect = "MIN($column) as min";
+        $result = static::getFirst();
         return $result['min'] ?? 0;
     }
 
     /**
      * MAX - Maximum value
      */
-    public function max($column)
+    public static function max($column)
     {
-        $this->querySelect = "MAX($column) as max";
-        $result = $this->getFirst();
+        static::$querySelect = "MAX($column) as max";
+        $result = static::getFirst();
         return $result['max'] ?? 0;
     }
 
     /**
      * COUNT - Count records
      */
-    public function countRows()
+    public static function countRows()
     {
-        $this->querySelect = "COUNT(*) as count";
-        $result = $this->getFirst();
+        static::$querySelect = "COUNT(*) as count";
+        $result = static::getFirst();
         return intval($result['count'] ?? 0);
     }
 
     /**
      * FIND OR FAIL - Find by ID or throw exception
      */
-    public function findOrFail($id)
+    public static function findOrFail($id)
     {
-        $result = $this->where(static::$primaryKey, $id)->getFirst();
+        $result = static::where(static::$primaryKey, $id)->getFirst();
         if (!$result) {
             throw new \Exception("Record with ID $id not found in " . static::getTable());
         }
@@ -896,9 +904,9 @@ class Model extends DatabaseQuery
     /**
      * FIND BY OR FAIL - Find by column or throw exception
      */
-    public function findByOrFail($column, $value)
+    public static function findByOrFail($column, $value)
     {
-        $result = $this->where($column, $value)->getFirst();
+        $result = static::where($column, $value)->getFirst();
         if (!$result) {
             throw new \Exception("Record with $column = $value not found in " . static::getTable());
         }
@@ -908,66 +916,66 @@ class Model extends DatabaseQuery
     /**
      * UPDATE - Update records
      */
-    public function updateRows($data)
+    public static function updateRows($data)
     {
         $table = static::getTable();
         $set = implode(', ', array_map(fn($col) => "$col = ?", array_keys($data)));
 
         $bindValues = array_values($data);
-        $whereClause = $this->buildWhere($bindValues);
+        $whereClause = static::buildWhere($bindValues);
 
         $sql = "UPDATE " . $table . " SET $set " . $whereClause;
 
-        $stmt = $this->executeQuery($sql, $bindValues);
-        $this->resetQuery();
+        $stmt = static::executeQuery($sql, $bindValues);
+        static::resetQuery();
         return true;
     }
 
     /**
      * INCREMENT - Increment a column value
      */
-    public function increment($column, $amount = 1)
+    public static function increment($column, $amount = 1)
     {
         $table = static::getTable();
         $bindValues = [$amount];
-        $whereClause = $this->buildWhere($bindValues);
+        $whereClause = static::buildWhere($bindValues);
 
         $sql = "UPDATE " . $table . " SET $column = $column + ? " . $whereClause;
 
-        $stmt = $this->executeQuery($sql, $bindValues);
-        $this->resetQuery();
+        $stmt = static::executeQuery($sql, $bindValues);
+        static::resetQuery();
         return true;
     }
 
     /**
      * DECREMENT - Decrement a column value
      */
-    public function decrement($column, $amount = 1)
+    public static function decrement($column, $amount = 1)
     {
         $table = static::getTable();
         $bindValues = [$amount];
-        $whereClause = $this->buildWhere($bindValues);
+        $whereClause = static::buildWhere($bindValues);
 
         $sql = "UPDATE " . $table . " SET $column = $column - ? " . $whereClause;
 
-        $stmt = $this->executeQuery($sql, $bindValues);
-        $this->resetQuery();
+        $stmt = static::executeQuery($sql, $bindValues);
+        static::resetQuery();
         return true;
     }
 
     /**
      * DELETE - Delete records
      */
-    public function deleteRows()
+    public static function deleteRows()
     {
         $table = static::getTable();
         $bindValues = [];
-        $whereClause = $this->buildWhere($bindValues);
+        $whereClause = static::buildWhere($bindValues);
 
         $sql = "DELETE FROM " . $table . $whereClause;
 
-        $stmt = $this->executeQuery($sql, $bindValues);
-        $this->resetQuery();
+        $stmt = static::executeQuery($sql, $bindValues);
+        static::resetQuery();
         return true;
     }
 
@@ -976,18 +984,16 @@ class Model extends DatabaseQuery
      */
     public static function updateOrCreate($conditions, $values)
     {
-        $instance = new static();
         foreach ($conditions as $col => $val) {
-            $instance->where($col, $val);
+            static::where($col, $val);
         }
-        $existingRecord = $instance->getFirst();
+        $existingRecord = static::getFirst();
 
         if ($existingRecord) {
-            $instance2 = new static();
             foreach ($conditions as $col => $val) {
-                $instance2->where($col, $val);
+                static::where($col, $val);
             }
-            return $instance2->updateRows($values);
+            return static::updateRows($values);
         } else {
             $dataToInsert = array_merge($conditions, $values);
             return static::create($dataToInsert);
@@ -997,12 +1003,12 @@ class Model extends DatabaseQuery
     /**
      * CHUNK - Process large datasets in batches
      */
-    public function chunk($size, callable $callback)
+    public static function chunk($size, callable $callback)
     {
         $page = 1;
         while (true) {
-            $this->resetQuery();
-            $results = $this->paginate($size, $page);
+            static::resetQuery();
+            $results = static::paginate($size, $page);
             if (empty($results)) {
                 break;
             }
@@ -1017,11 +1023,11 @@ class Model extends DatabaseQuery
     /**
      * PAGINATE - Get paginated results
      */
-    public function paginate($perPage, $page)
+    public static function paginate($perPage, $page)
     {
         $offset = ($page - 1) * $perPage;
-        $this->limit($perPage)->offset($offset);
-        return $this->get();
+        static::limit($perPage)->offset($offset);
+        return static::get();
     }
 
     /**
