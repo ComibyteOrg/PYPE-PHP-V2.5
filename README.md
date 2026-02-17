@@ -196,6 +196,29 @@ php pype.php migrate:rollback
 ```
 Rollback the last migration batch.
 
+
+```bash
+php pype.php migrate:fresh:model Admin
+php pype.php migrate:fresh:model User
+php pype.php migrate:fresh:model all  # Same as migrate:fresh
+```
+Drop and re-create a specific model's table:
+
+Available Commands 
+| Command | Description |
+|---------|-------------|
+| `php pype.php make:migration <name>` | Create a new migration |
+| `php pype.php migrate` | Run pending migrations |
+| `php pype.php migrate:rollback` | Rollback last migration |
+| `php pype.php migrate:fresh` | Drop all tables and re-migrate |
+| `php pype.php migrate:fresh:model <Model>` | Fresh migrate specific model |
+| `php pype.php migrate:fresh:model all` | Same as migrate:fresh |
+
+```bash
+php pype.php migrate:fresh
+```
+Drop all tables and re-run all migrations
+
 ### View Generation
 ```bash
 php pype.php createview home
