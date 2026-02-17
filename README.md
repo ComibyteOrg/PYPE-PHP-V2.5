@@ -372,123 +372,546 @@ class Post extends Model
 }
 ```
 
-#### Model ORM Methods
+### Two ORM Approaches
+- **DB Helper Class**: Static method-based query builder (Framework\Helper\DB)
+- **Model Base Class**: Extendable model-based ORM (Framework\Model\Model)
 
-##### Static Methods
+## Quick Examples
+
+### Using DB Helper Class
 ```php
 // Get all records
-$posts = Post::all();
+DB::users()->get();
 
 // Find by ID
-$post = Post::find(1);
+DB::users()->find(1);
 
-// Find by column
-$user = Post::findBy('email', 'user@example.com');
+// Find by ID or throw exception
+DB::users()->findOrFail(1);
 
-// Filter with conditions
-$published = Post::filter(['published' => true]);
+// Select specific columns
+DB::users()->select('id, name, email')->get();
 
-// Get first record
-$post = Post::first();
+// WHERE conditions
+DB::users()->where('status', 1)->get();
+DB::users()->where('age', 18, '>=')->get();
 
-// Count records
-$count = Post::count();
+// OR conditions
+DB::users()->where('status', 1)->orWhere('status', 2)->get();
 
-// Create new record
-$post = Post::create(['title' => 'New Post', 'content' => 'Content']);
+// Advanced WHERE conditions
+DB::users()->whereIn('id', [1, 2, 3])->get();
+DB::users()->whereNotIn('status', [0, 3])->get();
+DB::users()->whereBetween('age', 18, 65)->get();
+DB::users()->whereNotBetween('price', 100, 500)->get();
 
-// Update record
-Post::updateRecord(1, ['title' => 'Updated Title']);
+// LIKE queries
+DB::users()->whereLike('email', 'gmail')->get();
+DB::users()->whereNotLike('name', 'test')->get();
+DB::users()->whereStartsWith('username', 'admin')->get();
+DB::users()->whereEndsWith('domain', '.com')->get();
 
-// Delete record
-Post::destroy(1);
+// NULL checks
+DB::users()->whereNull('deleted_at')->get();
+DB::users()->whereNotNull('email')->get();
 
-// Truncate table
-Post::truncate();
+// JOINS
+DB::users()->join('posts', 'users.id', '=', 'posts.user_id')->get();
+DB::users()->leftJoin('posts', 'users.id', '=', 'posts.user_id')->get();
+DB::users()->rightJoin('posts', 'users.id', '=', 'posts.user_id')->get();
+DB::users()->innerJoin('posts', 'users.id', '=', 'posts.user_id')->get();
+DB::users()->crossJoin('domains')->get();
 
-// Raw SQL query
-$results = Post::raw("SELECT * FROM posts WHERE status = ?", [1]);
+// GROUPING & AGGREGATION
+DB::users()->groupBy('country')->get();
+DB::users()->groupBy('country')->having('COUNT(*)', '>', 5)->get();
+
+// DISTINCT results
+DB::users()->distinct()->select('country')->get();
+
+// ORDERING & LIMITING
+DB::users()->orderBy('name', 'ASC')->get();
+DB::users()->orderBy('created_at', 'DESC')->limit(10)->get();
+
+// PAGINATION
+DB::users()->paginate(15, 1);  // 15 per page, page 1
+DB::users()->take(10)->skip(20)->get();  // limit 10, offset 20
+
+// AGGREGATION FUNCTIONS
+DB::products()->sum('price');
+DB::products()->avg('rating');
+DB::products()->min('price');
+DB::products()->max('price');
+DB::users()->count();
+DB::users()->exists();
+
+// PLUCK - Get single column as array
+DB::users()->pluck('email');
+
+// ONLY - Select specific columns
+DB::users()->only(['id', 'name', 'email'])->get();
+
+// EXCEPT - Get all except specific columns
+DB::users()->get() | DB::except(['password', 'token']);
+
+// GET SPECIFIC COLUMNS
+DB::users()->distinct()->select('country')->get();
 ```
 
-##### Instance Methods
+### Using Model Base Class
 ```php
-// Create and save
-$post = new Post();
-$post->title = 'New Post';
-$post->content = 'Content';
-$post->save();
+// Define your model
+class User extends Model {}
+class Post extends Model {}
 
-// Update existing
-$post = Post::find(1);
-$post->title = 'Updated Title';
-$post->save();
+// Get all records
+User::all();
 
-// Delete instance
-$post = Post::find(1);
-$post->remove();
+// Find by ID (static method)
+User::find(1);
 
-// Access attributes
-echo $post->title;
-$post->title = 'New Title';
+// Find by ID or throw exception
+User::query()->findOrFail(1);
 
-// Convert to array/json
-$array = $post->toArray();
-$json = $post->toJson();
+// Select specific columns using query builder
+User::query()->select('id, name, email')->get();
+
+// WHERE conditions
+User::query()->where('status', 1)->get();
+User::query()->where('age', 18, '>=')->get();
+
+// OR conditions
+User::query()->where('status', 1)->orWhere('status', 2)->get();
+
+// Advanced WHERE conditions
+User::query()->whereIn('id', [1, 2, 3])->get();
+User::query()->whereNotIn('status', [0, 3])->get();
+User::query()->whereBetween('age', 18, 65)->get();
+User::query()->whereNotBetween('price', 100, 500)->get();
+
+// LIKE queries
+User::query()->whereLike('email', 'gmail')->get();
+User::query()->whereNotLike('name', 'test')->get();
+User::query()->whereStartsWith('username', 'admin')->get();
+User::query()->whereEndsWith('domain', '.com')->get();
+
+// NULL checks
+User::query()->whereNull('deleted_at')->get();
+User::query()->whereNotNull('email')->get();
+
+// JOINS
+Post::query()->leftJoin('users', 'posts.user_id', '=', 'users.id')->get();
+User::query()->innerJoin('posts', 'users.id', '=', 'posts.user_id')->get();
+
+// GROUPING & AGGREGATION
+User::query()->groupBy('country')->get();
+User::query()->groupBy('country')->having('COUNT(*)', '>', 5)->get();
+
+// DISTINCT results
+User::query()->distinct()->select('country')->get();
+
+// ORDERING & LIMITING
+User::query()->orderBy('name', 'ASC')->get();
+User::query()->orderBy('created_at', 'DESC')->limit(10)->get();
+
+// PAGINATION
+User::query()->paginate(15, 1);
+User::query()->take(10)->skip(20)->get();
+
+// AGGREGATION FUNCTIONS
+Post::query()->sum('views');
+Post::query()->avg('rating');
+Post::query()->min('price');
+Post::query()->max('price');
+User::query()->countRows();
+
+// PLUCK - Get single column as array
+User::query()->pluck('email');
+
+// ONLY - Select specific columns
+User::query()->only(['id', 'name', 'email'])->get();
+
+// FIND OR CREATE
+User::updateOrCreate(['email' => 'test@example.com'], ['name' => 'John']);
+
+// UPDATE with query builder
+User::query()->where('status', 1)->updateRows(['verified' => 1]);
+
+// INCREMENT/DECREMENT
+User::query()->where('id', 5)->increment('login_count');
+Post::query()->where('status', 'published')->decrement('draft_count');
+
+// CREATE new instance
+$user = new User(['name' => 'John', 'email' => 'john@example.com']);
+$user->save();
+
+// OR use static create
+User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
+
+// DELETE with query builder
+User::query()->where('status', 0)->deleteRows();
+
+// CHUNK process
+User::query()->chunk(100, function($users) {
+    foreach ($users as $user) {
+        // Process batch of 100 users
+    }
+});
 ```
 
-### 2. DB Helper (Fluent Query Builder)
-For more complex queries or direct database access without models.
+## When to Use DB vs Model
 
-#### DB Helper Methods
+### Use DB Helper Class When:
+- Writing quick queries in controllers
+- You don't need a structured model
+- Working with raw table operations  
+- Building ad-hoc reports
+
+**Example:**
 ```php
-use Framework\Helper\DB;
-
-// Fluent Query Builder
-$users = DB::users()->where('active', 1)->get();
-$user = DB::users()->where('id', 5)->first();
-$user = DB::users()->find(5);
-
-// Advanced queries
-$users = DB::users()
-    ->select('id, name, email')
-    ->where('age', 25, '>=')
-    ->orderBy('created_at', 'DESC')
+// In a controller
+$topUsers = DB::users()
+    ->where('status', 1)
+    ->orderBy('score', 'DESC')
     ->limit(10)
     ->get();
-
-// Joins
-$posts = DB::posts()
-    ->join('users', 'posts.user_id', '=', 'users.id')
-    ->where('users.active', 1)
-    ->get();
-
-// Aggregates
-$count = DB::users()->count();
-$total = DB::orders()->sum('amount');
-$average = DB::ratings()->avg('score');
-$min = DB::products()->min('price');
-$max = DB::products()->max('price');
-
-// Insert
-$id = DB::users()->insert([
-    'name' => 'John Doe',
-    'email' => 'john@example.com',
-    'active' => 1
-]);
-
-// Update
-DB::users()->update(['name' => 'Jane Doe'], ['id' => 5]);
-
-// Delete
-DB::users()->delete(['id' => 5]);
-
-// Raw queries
-$result = DB::table('users')->raw('SELECT * FROM users WHERE active = ?', [1]);
 ```
 
-Both approaches can be used depending on your needs:
-- Use **Model ORM** for structured, schema-defined operations with built-in methods
-- Use **DB Helper** for complex queries, ad-hoc operations, or when you don't need model features
+### Use Model Class When:
+- Structuring your application with models
+- You want type hints and IDE support
+- Building reusable business logic
+- You need model-specific methods
+- Working with relationships and collections
+
+**Example:**
+```php
+// Define a model
+class User extends Model {
+    protected static $table = 'users';
+    
+    public function getActiveUsers() {
+        return $this->where('status', 1)->get();
+    }
+}
+
+// Use the model
+$users = User::query()->where('status', 1)->get();
+```
+
+## Method Reference
+
+### Connection & Selection
+| Method | Description | Example |
+|--------|-------------|---------|
+| `table($name)` | Select table | `DB::table('users')` |
+| `$table()` | Shortcut | `DB::users()` |
+| `select($columns)` | SELECT clause | `.select('id, name')` |
+| `distinct()` | DISTINCT results | `.distinct()->get()` |
+| `debug()` | Enable SQL debugging | `.debug()->get()` |
+
+### WHERE Clauses
+| Method | Description | Example |
+|--------|-------------|---------|
+| `where($col, $val, $op)` | AND condition | `.where('id', 5)` |
+| `orWhere($col, $val, $op)` | OR condition | `.orWhere('id', 5)` |
+| `whereNull($col)` | IS NULL | `.whereNull('deleted_at')` |
+| `whereNotNull($col)` | IS NOT NULL | `.whereNotNull('email')` |
+| `whereIn($col, $arr)` | IN condition | `.whereIn('id', [1,2,3])` |
+| `whereNotIn($col, $arr)` | NOT IN condition | `.whereNotIn('id', [1,2,3])` |
+| `whereBetween($col, $min, $max)` | BETWEEN | `.whereBetween('age', 18, 65)` |
+| `whereNotBetween($col, $min, $max)` | NOT BETWEEN | `.whereNotBetween('age', 18, 65)` |
+| `whereLike($col, $val)` | LIKE %val% | `.whereLike('email', 'gmail')` |
+| `whereNotLike($col, $val)` | NOT LIKE | `.whereNotLike('name', 'test')` |
+| `whereStartsWith($col, $val)` | LIKE val% | `.whereStartsWith('user', 'admin')` |
+| `whereEndsWith($col, $val)` | LIKE %val | `.whereEndsWith('email', '.com')` |
+
+### JOINS
+| Method | Description | Example |
+|--------|-------------|---------|
+| `join($table, $first, $op, $second)` | INNER JOIN | `.join('posts', 'u.id', '=', 'p.user_id')` |
+| `leftJoin($table, $first, $op, $second)` | LEFT JOIN | `.leftJoin('posts', 'u.id', '=', 'p.user_id')` |
+| `rightJoin($table, $first, $op, $second)` | RIGHT JOIN | `.rightJoin('posts', 'u.id', '=', 'p.user_id')` |
+| `innerJoin($table, $first, $op, $second)` | INNER JOIN | `.innerJoin('posts', 'u.id', '=', 'p.user_id')` |
+| `crossJoin($table)` | CROSS JOIN | `.crossJoin('domains')` |
+
+### GROUPING & HAVING
+| Method | Description | Example |
+|--------|-------------|---------|
+| `groupBy($col)` | GROUP BY | `.groupBy('country')` |
+| `having($col, $op, $val)` | HAVING clause | `.having('COUNT(*)', '>', 5)` |
+
+### ORDERING & LIMITING
+| Method | Description | Example |
+|--------|-------------|---------|
+| `orderBy($col, $dir)` | ORDER BY | `.orderBy('name', 'ASC')` |
+| `limit($count)` | LIMIT | `.limit(10)` |
+| `offset($count)` | OFFSET | `.offset(20)` |
+| `take($count)` | Alias for limit | `.take(10)` |
+| `skip($count)` | Alias for offset | `.skip(20)` |
+| `paginate($perPage, $page)` | Pagination | `.paginate(15, 1)` |
+
+### RETRIEVAL
+
+#### DB Helper Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `get()` | Fetch all results | `DB::users()->get()` |
+| `first()` | Fetch first record | `DB::users()->first()` |
+| `find($id)` | Find by primary key | `DB::users()->find(1)` |
+| `findOrFail($id)` | Find by ID or throw | `DB::users()->findOrFail(1)` |
+| `count()` | Count records | `DB::users()->count()` |
+| `exists()` | Check if exists | `DB::users()->exists()` |
+| `pluck($col)` | Get single column array | `DB::users()->pluck('email')` |
+
+#### Model Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `all()` | Get all records (static) | `User::all()` |
+| `get()` | Fetch all results (query builder) | `User::query()->get()` |
+| `getFirst()` | Fetch first record | `User::query()->getFirst()` |
+| `first()` | Get first record (static) | `User::first()` |
+| `find($id)` | Find by primary key (static) | `User::find(1)` |
+| `findOrFail($id)` | Find by ID or throw | `User::query()->findOrFail(1)` |
+| `findBy($col, $val)` | Find by column (static) | `User::findBy('email', 'test@ex.com')` |
+| `findByOrFail($col, $val)` | Find by column or throw | `User::query()->findByOrFail('email', 'test@ex.com')` |
+| `countRows()` | Count records | `User::query()->countRows()` |
+| `count()` | Count records (static) | `User::count()` |
+| `exists()` | Check if exists | `User::query()->exists()` |
+| `pluck($col)` | Get single column array | `User::query()->pluck('email')` |
+
+### AGGREGATION
+
+#### DB Helper Class
+| Method | Example |
+|--------|---------|
+| `sum($col)` | `DB::products()->sum('price')` |
+| `avg($col)` | `DB::products()->avg('rating')` |
+| `min($col)` | `DB::products()->min('price')` |
+| `max($col)` | `DB::products()->max('price')` |
+
+#### Model Class
+| Method | Example |
+|--------|---------|
+| `sum($col)` | `Product::query()->sum('price')` |
+| `avg($col)` | `Product::query()->avg('rating')` |
+| `min($col)` | `Product::query()->min('price')` |
+| `max($col)` | `Product::query()->max('price')` |
+
+### COLUMN SELECTION
+| Method | DB Example | Model Example |
+|--------|-------------|---------|
+| `only($cols)` | `DB::users()->only(['id', 'name'])->get()` | `User::query()->only(['id', 'name'])->get()` |
+| `except($cols)` | `DB::users()->except(['password'])` | `User::query()->except(['password'])` |
+| `pluck($col)` | `DB::users()->pluck('email')` | `User::query()->pluck('email')` |
+| `getColumns($col)` | `DB::users()->getColumns('id')` | `User::query()->getColumns('id')` |
+
+### MODIFICATION
+
+#### DB Helper Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `create($data)` | Insert new record | `DB::users()->create(['name' => 'John'])` |
+| `insert($data)` | Insert record | `DB::users()->insert(['name' => 'John'])` |
+| `update($data, $where)` | Update records | `DB::users()->update(['status' => 1], ['id' => 1])` |
+| `delete($where)` | Delete records | `DB::users()->delete(['id' => 1])` |
+| `increment($col, $amt)` | Increment column | `DB::users()->increment('views', 1)` |
+| `decrement($col, $amt)` | Decrement column | `DB::users()->decrement('stock', 1)` |
+| `updateOrCreate($cond, $vals)` | Update or insert | `DB::users()->updateOrCreate(['email' => 'x@x.com'], ['name' => 'John'])` |
+| `upsert($data, $unique)` | Batch upsert | `DB::users()->upsert($records, ['id'])` |
+
+#### Model Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `create($data)` | Create new record (static) | `User::create(['name' => 'John'])` |
+| `insert($data)` | Insert record (inherited) | Model::insert(['name' => 'John'])` |
+| `updateRows($data)` | Update via query builder | `User::query()->where('id', 1)->updateRows(['status' => 1])` |
+| `deleteRows()` | Delete via query builder | `User::query()->where('status', 0)->deleteRows()` |
+| `increment($col, $amt)` | Increment column | `User::query()->where('id', 5)->increment('login_count')` |
+| `decrement($col, $amt)` | Decrement column | `User::query()->where('id', 5)->decrement('login_count')` |
+| `updateOrCreate($cond, $vals)` | Update or create (static) | `User::updateOrCreate(['email' => 'x@x.com'], ['name' => 'John'])` |
+| `upsert($data, $unique)` | Batch upsert (static) | `User::upsert($records, ['id'])` |
+| `save()` | Save instance | `$user->save()` |
+| `remove()` | Delete instance | `$user->remove()` |
+
+### BATCH OPERATIONS
+| Method | DB Example | Model Example |
+|--------|-------------|---------|
+| `chunk($size, $callback)` | `DB::users()->chunk(100, function($records) { ... })` | `User::query()->chunk(100, function($records) { ... })` |
+| `paginate($perPage, $page)` | `DB::users()->paginate(15, 1)` | `User::query()->paginate(15, 1)` |
+| `take($limit)` | `DB::users()->take(10)->get()` | `User::query()->take(10)->get()` |
+| `skip($offset)` | `DB::users()->skip(20)->get()` | `User::query()->skip(20)->get()` |
+
+### UTILITIES
+| Method | DB Example | Model Example |
+|--------|-------------|---------|
+| `raw($sql, $bindings)` | `DB::raw('SELECT * FROM users WHERE id > ?', [5])` | `User::raw('SELECT * FROM users WHERE id > ?', [5])` |
+| `transaction($callback)` | `DB::table('users')->transaction(function($db) { ... })` | `User::transaction(function($user) { ... })` |
+| `debug()` | `DB::users()->debug()->get()` | `User::query()->debug()->get()` |
+
+## Advanced Examples
+
+### Complex DB Query
+```php
+DB::users()
+    ->select('users.id, users.name, COUNT(posts.id) as post_count')
+    ->leftJoin('posts', 'users.id', '=', 'posts.user_id')
+    ->where('users.status', 1)
+    ->having('COUNT(posts.id)', '>', 5)
+    ->groupBy('users.id')
+    ->orderBy('post_count', 'DESC')
+    ->limit(10)
+    ->get();
+```
+
+### Complex Model Query
+```php
+Post::query()
+    ->select('posts.id, posts.title, users.name, COUNT(comments.id) as comment_count')
+    ->leftJoin('users', 'posts.user_id', '=', 'users.id')
+    ->leftJoin('comments', 'posts.id', '=', 'comments.post_id')
+    ->where('posts.status', 'published')
+    ->having('COUNT(comments.id)', '>', 10)
+    ->groupBy('posts.id')
+    ->orderBy('comment_count', 'DESC')
+    ->limit(20)
+    ->get();
+```
+
+### Transaction Example - DB
+```php
+DB::table('users')->transaction(function($db) {
+    $db->insert(['name' => 'John', 'email' => 'john@example.com']);
+    $db->insert(['name' => 'Jane', 'email' => 'jane@example.com']);
+});
+```
+
+### Transaction Example - Model
+```php
+User::transaction(function($user) {
+    User::create(['name' => 'John', 'email' => 'john@example.com']);
+    User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
+});
+```
+
+### Batch Processing - DB
+```php
+DB::users()->chunk(500, function($users) {
+    foreach ($users as $user) {
+        // Process each user
+        sendWelcomeEmail($user['email']);
+    }
+});
+```
+
+### Batch Processing - Model
+```php
+User::query()->chunk(500, function($users) {
+    foreach ($users as $user) {
+        // Process each user  
+        sendNotification($user);
+    }
+});
+```
+
+### Conditional Update - DB
+```php
+DB::users()
+    ->where('country', 'USA')
+    ->where('status', 1)
+    ->update(['verified' => 1], ['country' => 'USA', 'status' => 1]);
+```
+
+### Conditional Update - Model
+```php
+User::query()
+    ->where('country', 'USA')
+    ->where('status', 1)
+    ->updateRows(['verified' => 1]);
+```
+
+### Atomic Operations - DB
+```php
+// Increment views for posts
+DB::posts()->where('id', 5)->increment('views', 1);
+
+// Decrement stock for products
+DB::products()->where('id', 10)->decrement('stock', 1);
+```
+
+### Atomic Operations - Model
+```php
+// Increment login count for user
+User::query()->where('id', 5)->increment('login_count');
+
+// Decrement available seats
+Event::query()->where('id', 10)->decrement('available_seats');
+```
+
+### Upsert - DB
+```php
+$records = [
+    ['id' => 1, 'name' => 'John', 'email' => 'john@example.com'],
+    ['id' => 2, 'name' => 'Jane', 'email' => 'jane@example.com'],
+];
+
+DB::users()->upsert($records, ['id']);
+```
+
+### Upsert - Model
+```php
+$records = [
+    ['id' => 1, 'name' => 'John', 'email' => 'john@example.com'],
+    ['id' => 2, 'name' => 'Jane', 'email' => 'jane@example.com'],
+];
+
+User::upsert($records, ['id']);
+```
+
+## Operators
+
+### Comparison Operators
+- `=` - Equal
+- `!=` or `<>` - Not equal
+- `>` - Greater than
+- `>=` - Greater than or equal
+- `<` - Less than
+- `<=` - Less than or equal
+- `LIKE` - Pattern matching
+- `NOT LIKE` - Inverse pattern matching
+- `IN` - In array
+- `NOT IN` - Not in array
+- `BETWEEN` - Between range
+- `NOT BETWEEN` - Not between range
+
+## Important Notes
+
+### DB Helper Class
+- Use for quick queries and raw table operations
+- Static method-based interface
+- Less boilerplate code
+- Good for simple operations
+- All queries auto-reset after execution
+
+### Model Base Class
+- Use for application structure and business logic
+- Supports both static methods (legacy) and instance methods (query builder)
+- Better for type hints and IDE autocompletion
+- Chainable query builder with `Model::query()`
+- Queries reset after execution via `resetQuery()`
+- Can be extended with custom methods
+- Supports model instances with `save()` and `remove()`
+
+### Security
+- All methods use parameterized queries
+- SQL injection is prevented through prepared statements
+- Bind values are properly escaped for the database type
+
+### Database Support
+- MySQL 5.7+
+- PostgreSQL 10+
+- SQLite 3+
+- All query builder methods work across all supported databases
 ```
 
 ## Controllers
