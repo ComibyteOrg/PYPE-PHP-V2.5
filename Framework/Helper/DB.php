@@ -11,6 +11,8 @@ class DB extends Connect
     protected static $select = '*';
     protected static $joins = [];
     protected static $where = [];
+    protected static $having = '';
+    protected static $havingValues = [];
     protected static $order = '';
     protected static $group = '';
     protected static $limit = '';
@@ -30,6 +32,8 @@ class DB extends Connect
         self::$select = '*';
         self::$joins = [];
         self::$where = [];
+        self::$having = '';
+        self::$havingValues = [];
         self::$order = '';
         self::$group = '';
         self::$limit = '';
@@ -95,6 +99,49 @@ class DB extends Connect
         return $this;
     }
 
+    public function whereNotIn($column, array $values)
+    {
+        $placeholders = implode(',', array_fill(0, count($values), '?'));
+        self::$where[] = ['AND', "$column NOT IN ($placeholders)", 'NOT IN', $values];
+        return $this;
+    }
+
+    public function whereBetween($column, $min, $max)
+    {
+        self::$where[] = ['AND', "$column BETWEEN ? AND ?", 'BETWEEN', [$min, $max]];
+        return $this;
+    }
+
+    public function whereNotBetween($column, $min, $max)
+    {
+        self::$where[] = ['AND', "$column NOT BETWEEN ? AND ?", 'NOT BETWEEN', [$min, $max]];
+        return $this;
+    }
+
+    public function whereLike($column, $value)
+    {
+        self::$where[] = ['AND', $column, 'LIKE', "%$value%"];
+        return $this;
+    }
+
+    public function whereNotLike($column, $value)
+    {
+        self::$where[] = ['AND', $column, 'NOT LIKE', "%$value%"];
+        return $this;
+    }
+
+    public function whereStartsWith($column, $value)
+    {
+        self::$where[] = ['AND', $column, 'LIKE', "$value%"];
+        return $this;
+    }
+
+    public function whereEndsWith($column, $value)
+    {
+        self::$where[] = ['AND', $column, 'LIKE', "%$value"];
+        return $this;
+    }
+
     // ORDER BY
     public function orderBy($column, $direction = 'ASC')
     {
@@ -106,6 +153,21 @@ class DB extends Connect
     public function groupBy($column)
     {
         self::$group = " GROUP BY $column ";
+        return $this;
+    }
+
+    public function having($column, $operator, $value)
+    {
+        // Add support for HAVING clause
+        if (!isset(self::$having)) {
+            self::$having = '';
+        }
+        $operator = strtoupper($operator);
+        self::$having .= (self::$having ? ' AND ' : ' HAVING ') . "$column $operator ?";
+        if (!isset(self::$havingValues)) {
+            self::$havingValues = [];
+        }
+        self::$havingValues[] = $value;
         return $this;
     }
 
@@ -135,6 +197,34 @@ class DB extends Connect
         return $this;
     }
 
+    public function rightJoin($table, $first, $operator, $second)
+    {
+        self::$joins[] = " RIGHT JOIN $table ON $first $operator $second ";
+        return $this;
+    }
+
+    public function innerJoin($table, $first, $operator, $second)
+    {
+        self::$joins[] = " INNER JOIN $table ON $first $operator $second ";
+        return $this;
+    }
+
+    public function crossJoin($table)
+    {
+        self::$joins[] = " CROSS JOIN $table ";
+        return $this;
+    }
+
+    public function distinct()
+    {
+        if (self::$select === '*') {
+            self::$select = 'DISTINCT *';
+        } else {
+            self::$select = 'DISTINCT ' . self::$select;
+        }
+        return $this;
+    }
+
     // RAW Queries
     public function raw($sql, $bindValues = [])
     {
@@ -156,10 +246,14 @@ class DB extends Connect
             $condition = '';
             if (count($w) == 2) { // NULL
                 $condition = "{$w[0]} {$w[1]}";
-            } elseif ($w[2] === 'IN') {
+            } elseif (in_array($w[2], ['IN', 'NOT IN', 'BETWEEN', 'NOT BETWEEN'])) {
                 $condition = "{$w[1]}";
-                foreach ($w[3] as $v) {
-                    $bindValues[] = $v;
+                if (is_array($w[3])) {
+                    foreach ($w[3] as $v) {
+                        $bindValues[] = $v;
+                    }
+                } else {
+                    $bindValues[] = $w[3];
                 }
             } else {
                 $condition = "{$w[0]} {$w[1]} {$w[2]} ?";
@@ -183,10 +277,17 @@ class DB extends Connect
         $where = $this->buildWhere($bindValues);
         $joins = implode('', self::$joins);
 
+        $having = '';
+        if (!empty(self::$having)) {
+            $having = self::$having;
+            $bindValues = array_merge($bindValues, self::$havingValues);
+        }
+
         $sql = "SELECT " . self::$select . " FROM " . self::$table . " "
             . $joins . " "
             . $where . " "
             . self::$group
+            . $having
             . self::$order
             . self::$limit
             . self::$offset;
@@ -240,6 +341,27 @@ class DB extends Connect
         error_log("DB::find called on table " . self::$table . " with id: $id");
         $result = $this->where('id', $id)->first();
         error_log("DB::find result: " . json_encode($result));
+        return $result;
+    }
+
+    // FIND BY ID OR THROW EXCEPTION
+    public function findOrFail($id)
+    {
+        $result = $this->find($id);
+        if (!$result) {
+            throw new \Exception("Record with ID $id not found in " . self::$table);
+        }
+        return $result;
+    }
+
+    // FIND BY COLUMN VALUE OR FAIL
+    public function findByOrFail($column, $value)
+    {
+        $this->where($column, $value);
+        $result = $this->first();
+        if (!$result) {
+            throw new \Exception("Record with $column = $value not found in " . self::$table);
+        }
         return $result;
     }
 
@@ -317,6 +439,123 @@ class DB extends Connect
         return $id;
     }
 
+    // SHORTCUT FOR INSERT (creates and returns the ID)
+    public function create($data)
+    {
+        return $this->insert($data);
+    }
+
+    // INCREMENT A COLUMN VALUE
+    public function increment($column, $amount = 1, $conditions = [])
+    {
+        error_log("DB::increment called on table " . self::$table);
+        $instance = new static();
+
+        if (!empty($conditions)) {
+            foreach ($conditions as $col => $val) {
+                $instance->where($col, $val);
+            }
+        }
+
+        $bindValues = [];
+        $whereClause = $instance->buildWhere($bindValues);
+
+        $sql = "UPDATE " . self::$table . " SET $column = $column + ? " . $whereClause;
+        array_unshift($bindValues, $amount);
+
+        $stmt = $this->run($sql, $bindValues);
+        self::reset();
+        return true;
+    }
+
+    // DECREMENT A COLUMN VALUE
+    public function decrement($column, $amount = 1, $conditions = [])
+    {
+        error_log("DB::decrement called on table " . self::$table);
+        $instance = new static();
+
+        if (!empty($conditions)) {
+            foreach ($conditions as $col => $val) {
+                $instance->where($col, $val);
+            }
+        }
+
+        $bindValues = [];
+        $whereClause = $instance->buildWhere($bindValues);
+
+        $sql = "UPDATE " . self::$table . " SET $column = $column - ? " . $whereClause;
+        array_unshift($bindValues, $amount);
+
+        $stmt = $this->run($sql, $bindValues);
+        self::reset();
+        return true;
+    }
+
+    // UPDATE OR CREATE - Find or create with defaults
+    public function updateOrCreate($conditions, $values)
+    {
+        error_log("DB::updateOrCreate called");
+
+        // Try to find existing record
+        $instance = new static();
+        foreach ($conditions as $col => $val) {
+            $instance->where($col, $val);
+        }
+        $existingRecord = $instance->first();
+
+        if ($existingRecord) {
+            // Update existing
+            $mergedData = array_merge($existingRecord, $values);
+            return $this->update($values, $conditions);
+        } else {
+            // Create new
+            $dataToInsert = array_merge($conditions, $values);
+            return $this->insert($dataToInsert);
+        }
+    }
+
+    // UPSERT - Batch insert or update (MySQL DUPLICATE KEY UPDATE equivalent)
+    public function upsert($data, $uniqueColumns = ['id'])
+    {
+        error_log("DB::upsert called on table " . self::$table);
+
+        if (empty($data)) {
+            return false;
+        }
+
+        // Ensure data is array of arrays
+        if (!isset($data[0]) || !is_array($data[0])) {
+            $data = [$data];
+        }
+
+        $columns = array_keys($data[0]);
+        $placeholders = implode(',', array_fill(0, count($data), '(' . implode(',', array_fill(0, count($columns), '?')) . ')'));
+
+        $flatValues = [];
+        foreach ($data as $row) {
+            foreach ($columns as $col) {
+                $flatValues[] = $row[$col] ?? null;
+            }
+        }
+
+        // Build ON DUPLICATE KEY UPDATE clause
+        $updateClause = implode(', ', array_map(
+            fn($col) => "$col = VALUES($col)",
+            array_diff($columns, $uniqueColumns)
+        ));
+
+        $sql = "INSERT INTO " . self::$table . " (" . implode(',', $columns) . ") VALUES $placeholders";
+        if (!empty($updateClause)) {
+            $sql .= " ON DUPLICATE KEY UPDATE $updateClause";
+        }
+
+        $stmt = $this->connection->prepare($sql);
+        $result = $stmt->execute($flatValues);
+
+        self::reset();
+        return $result;
+    }
+
     // UPDATE
     public function update($data, $where)
     {
@@ -355,6 +594,67 @@ class DB extends Connect
 
         self::reset();
         return true;
+    }
+
+    // CHUNK - Process large datasets in batches
+    public function chunk($size, callable $callback)
+    {
+        $page = 1;
+        while (true) {
+            $results = $this->paginate($size, $page);
+            if (empty($results)) {
+                break;
+            }
+            if ($callback($results) === false) {
+                break;
+            }
+            $page++;
+        }
+        return true;
+    }
+
+    // TAKE - Alias for limit
+    public function take($limit)
+    {
+        return $this->limit($limit);
+    }
+
+    // SKIP - Alias for offset
+    public function skip($offset)
+    {
+        return $this->offset($offset);
+    }
+
+    // GET COLUMNS - Get specific columns as array
+    public function getColumns($column)
+    {
+        return $this->pluck($column);
+    }
+
+    // ONLY - Select specific columns
+    public function only($columns)
+    {
+        $cols = is_array($columns) ? implode(', ', $columns) : $columns;
+        return $this->select($cols);
+    }
+
+    // EXCEPT - Select all columns except specified ones (get all and then unset)
+    public function except($columns, $data = null)
+    {
+        $excludedColumns = is_array($columns) ? $columns : [$columns];
+        if ($data === null) {
+            $data = $this->get();
+        }
+
+        if (is_array($data) && count($data) > 0 && is_array($data[0])) {
+            foreach ($data as &$row) {
+                foreach ($excludedColumns as $col) {
+                    unset($row[$col]);
+                }
+            }
+        }
+
+        return $data;
     }
 
     // TRANSACTIONS
