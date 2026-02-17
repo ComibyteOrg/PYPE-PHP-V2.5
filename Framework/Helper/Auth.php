@@ -1,89 +1,342 @@
 <?php
+
 namespace Framework\Helper;
 
-use Framework\Database\DatabaseQuery;
+use Framework\Helper\DB;
 
+/**
+ * Universal Authentication Helper
+ * 
+ * Works with any database table (users, admins, members, etc.)
+ * 
+ * Usage:
+ *   Auth::table('users')->login($email, $password);
+ *   Auth::table('admins')->login($email, $password);
+ *   Auth::table('members')->login($email, $password, 'email', 'password');
+ * 
+ *   Auth::table('users')->authenticate($email, $password);
+ *   Auth::table('users')->check();
+ *   Auth::table('users')->user();
+ *   Auth::table('users')->logout();
+ */
 class Auth
 {
-    private $userData = null;
-    private $db;
+    /**
+     * Table to authenticate against
+     * @var string
+     */
+    protected static $table = 'users';
 
-    public function __construct()
+    /**
+     * Email column name
+     * @var string
+     */
+    protected static $emailColumn = 'email';
+
+    /**
+     * Password column name
+     * @var string
+     */
+    protected static $passwordColumn = 'password';
+
+    /**
+     * Session key for storing authenticated user
+     * @var string
+     */
+    protected static $sessionKey = 'auth_user';
+
+    /**
+     * Remember me cookie name
+     * @var string
+     */
+    protected static $cookieName = 'remember_me';
+
+    /**
+     * Set the table to authenticate against
+     * @param string $table
+     * @return Auth
+     */
+    public static function table(string $table)
     {
-        $this->db = new DatabaseQuery();
+        static::$table = $table;
+        return new static();
     }
 
-    public function check()
+    /**
+     * Set custom column names
+     * @param string $emailColumn
+     * @param string $passwordColumn
+     * @return Auth
+     */
+    public function columns(string $emailColumn = 'email', string $passwordColumn = 'password')
     {
-        return Helper::check();
+        static::$emailColumn = $emailColumn;
+        static::$passwordColumn = $passwordColumn;
+        return $this;
     }
 
-    public function id()
+    /**
+     * Set session key
+     * @param string $key
+     * @return Auth
+     */
+    public function sessionKey(string $key)
     {
-        $a = Helper::auth();
-        // If Helper::auth() returns a full user record (array or object), return its id
-        if (is_array($a)) {
-            return $a['id'] ?? null;
-        }
-
-        if (is_object($a)) {
-            return $a->id ?? null;
-        }
-
-        // Otherwise it's likely an id or null
-        return $a;
+        static::$sessionKey = $key;
+        return $this;
     }
 
-    public function user()
+    /**
+     * Set cookie name for remember me
+     * @param string $name
+     * @return Auth
+     */
+    public function cookieName(string $name)
     {
-        return $this->getUserData();
+        static::$cookieName = $name;
+        return $this;
     }
 
-    private function getUserData()
+    /**
+     * Authenticate user with email and password
+     * @param string $email
+     * @param string $password
+     * @param bool $remember
+     * @return object|null Returns user object on success, null on failure
+     */
+    public function login(string $email, string $password, bool $remember = false)
     {
-        if ($this->userData !== null) {
-            return $this->userData;
-        }
-        // If Helper::auth() already returned a full user record, use it
-        $a = Helper::auth();
-        if (is_array($a) || is_object($a)) {
-            $this->userData = is_object($a) ? (array) $a : $a;
-            return $this->userData;
+        // Find user by email
+        $user = DB::table(static::$table)
+            ->where(static::$emailColumn, $email)
+            ->first();
+
+        if (!$user) {
+            return null;
         }
 
-        $id = $this->id();
+        // Verify password
+        if (!password_verify($password, $user[static::$passwordColumn] ?? '')) {
+            return null;
+        }
+
+        // Store user in session
+        $this->setSession($user);
+
+        // Set remember me cookie if requested
+        if ($remember) {
+            $this->setRememberToken($user);
+        }
+
+        return (object) $user;
+    }
+
+    /**
+     * Register a new user
+     * @param array $data
+     * @param bool $autoLogin
+     * @return object|null
+     */
+    public function register(array $data, bool $autoLogin = true)
+    {
+        // Hash password if present
+        if (isset($data[static::$passwordColumn])) {
+            $data[static::$passwordColumn] = password_hash($data[static::$passwordColumn], PASSWORD_DEFAULT);
+        }
+
+        // Insert user
+        $id = DB::table(static::$table)->insert($data);
+
         if (!$id) {
             return null;
         }
 
-        try {
-            // Fetch user from 'users' table using DatabaseQuery fallback
-            $result = $this->db->select('users', '*', "id = ?", "i", [$id]);
+        $data['id'] = $id;
 
-            if ($result && $result->num_rows > 0) {
-                $this->userData = $result->fetch_assoc();
-                return $this->userData;
+        // Auto login if requested
+        if ($autoLogin) {
+            $this->setSession($data);
+        }
+
+        return (object) $data;
+    }
+
+    /**
+     * Check if user is authenticated
+     * @return bool
+     */
+    public function check()
+    {
+        return $this->user() !== null;
+    }
+
+    /**
+     * Get authenticated user
+     * @return object|null
+     */
+    public function user()
+    {
+        // Check session first
+        if (isset($_SESSION[static::$sessionKey])) {
+            return (object) $_SESSION[static::$sessionKey];
+        }
+
+        // Check remember me cookie
+        $token = $_COOKIE[static::$cookieName] ?? null;
+        if ($token) {
+            $user = $this->validateRememberToken($token);
+            if ($user) {
+                $this->setSession($user);
+                return (object) $user;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get authenticated user (alias for user())
+     * @return object|null
+     */
+    public function authenticate()
+    {
+        return $this->user();
+    }
+
+    /**
+     * Logout user
+     * @return void
+     */
+    public function logout()
+    {
+        // Clear session
+        unset($_SESSION[static::$sessionKey]);
+
+        // Clear remember me cookie
+        if (isset($_COOKIE[static::$cookieName])) {
+            $this->clearRememberToken();
+        }
+    }
+
+    /**
+     * Get user ID
+     * @return int|null
+     */
+    public function id()
+    {
+        $user = $this->user();
+        return $user->id ?? null;
+    }
+
+    /**
+     * Set user in session
+     * @param array $user
+     * @return void
+     */
+    protected function setSession(array $user)
+    {
+        // Remove password from session
+        unset($user[static::$passwordColumn]);
+        $_SESSION[static::$sessionKey] = $user;
+    }
+
+    /**
+     * Set remember me token
+     * @param array $user
+     * @return void
+     */
+    protected function setRememberToken(array $user)
+    {
+        $token = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+
+        // Store token in database
+        $this->createRememberToken($user['id'] ?? null, $token, $expiresAt);
+
+        // Set cookie
+        setcookie(static::$cookieName, $token, strtotime('+30 days'), '/');
+    }
+
+    /**
+     * Create remember token in database
+     * @param int|null $userId
+     * @param string $token
+     * @param string $expiresAt
+     * @return void
+     */
+    protected function createRememberToken($userId, string $token, string $expiresAt)
+    {
+        // Try to insert into remember_me_tokens table if it exists
+        try {
+            DB::table('remember_me_tokens')->insert([
+                'user_id' => $userId,
+                'token' => $token,
+                'expires_at' => $expiresAt,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        } catch (\Exception $e) {
+            // Table doesn't exist, skip
+        }
+    }
+
+    /**
+     * Validate remember token
+     * @param string $token
+     * @return array|null
+     */
+    protected function validateRememberToken(string $token)
+    {
+        try {
+            $rememberToken = DB::table('remember_me_tokens')
+                ->where('token', $token)
+                ->where('expires_at', '>', date('Y-m-d H:i:s'))
+                ->first();
+
+            if ($rememberToken) {
+                $user = DB::table(static::$table)->find($rememberToken['user_id']);
+                
+                // Delete used token
+                DB::table('remember_me_tokens')
+                    ->where('token', $token)
+                    ->delete([]);
+                
+                return $user;
             }
         } catch (\Exception $e) {
-            // If table doesn't exist or other error, show message as requested
-            die("Error: users table does not exist or database error: " . $e->getMessage());
+            // Table doesn't exist, skip
         }
 
         return null;
     }
 
-    public function __get($name)
+    /**
+     * Clear remember token
+     * @return void
+     */
+    protected function clearRememberToken()
     {
-        $data = $this->getUserData();
-        if ($data && isset($data[$name])) {
-            return $data[$name];
-        }
-        return null;
+        setcookie(static::$cookieName, '', time() - 3600, '/');
     }
 
-    public function __isset($name)
+    /**
+     * Get the current table
+     * @return string
+     */
+    public static function getTable()
     {
-        $data = $this->getUserData();
-        return isset($data[$name]);
+        return static::$table;
+    }
+
+    /**
+     * Reset to default settings
+     * @return void
+     */
+    public static function reset()
+    {
+        static::$table = 'users';
+        static::$emailColumn = 'email';
+        static::$passwordColumn = 'password';
+        static::$sessionKey = 'auth_user';
+        static::$cookieName = 'remember_me';
     }
 }
