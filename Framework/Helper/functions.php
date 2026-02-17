@@ -383,3 +383,414 @@ if (!function_exists('redirectWith')) {
         Helper::redirectWith($url, $key, $message, $seconds);
     }
 }
+
+// =========================================================
+// AUTHENTICATION HELPERS (Universal - Works with any table)
+// =========================================================
+
+if (!function_exists('auth')) {
+    /**
+     * Get Auth instance for a specific table or default user
+     * @param string|null $table Table name (default: users)
+     * @return \Framework\Helper\Auth|null
+     */
+    function auth($table = null)
+    {
+        if ($table === null) {
+            return Helper::auth();
+        }
+        return Helper::auth($table);
+    }
+}
+
+if (!function_exists('login')) {
+    /**
+     * Login user to any table
+     * @param string $email
+     * @param string $password
+     * @param string $table Table name (default: users)
+     * @param bool $remember Remember me
+     * @return object|null
+     */
+    function login($email, $password, $table = 'users', $remember = false)
+    {
+        return Helper::login($email, $password, $table, $remember);
+    }
+}
+
+if (!function_exists('register')) {
+    /**
+     * Register new user
+     * @param array $data User data
+     * @param string $table Table name (default: users)
+     * @param bool $autoLogin Auto login after register
+     * @return object|null
+     */
+    function register($data, $table = 'users', $autoLogin = true)
+    {
+        return Helper::register($data, $table, $autoLogin);
+    }
+}
+
+if (!function_exists('check')) {
+    /**
+     * Check if user is authenticated
+     * @param string $table Table name (default: users)
+     * @return bool
+     */
+    function check($table = 'users')
+    {
+        return Helper::check($table);
+    }
+}
+
+if (!function_exists('user')) {
+    /**
+     * Get authenticated user
+     * @param string $table Table name (default: users)
+     * @return object|null
+     */
+    function user($table = 'users')
+    {
+        return Helper::user($table);
+    }
+}
+
+if (!function_exists('logout')) {
+    /**
+     * Logout user
+     * @param string $table Table name (default: users)
+     * @return void
+     */
+    function logout($table = 'users')
+    {
+        Helper::logout($table);
+    }
+}
+
+if (!function_exists('userId')) {
+    /**
+     * Get authenticated user ID
+     * @param string $table Table name (default: users)
+     * @return int|null
+     */
+    function userId($table = 'users')
+    {
+        return Helper::userId($table);
+    }
+}
+
+if (!function_exists('isAdmin')) {
+    /**
+     * Check if admin is authenticated
+     * @return bool
+     */
+    function isAdmin()
+    {
+        return Helper::adminCheck();
+    } 
+}
+
+if (!function_exists('admin')) {
+    /**
+     * Get authenticated admin
+     * @return object|null
+     */
+    function admin()
+    {
+        return Helper::adminAuth();
+    }
+}
+
+if (!function_exists('adminLogin')) {
+    /**
+     * Login admin
+     * @param string $email
+     * @param string $password
+     * @param bool $remember Remember me
+     * @return object|null
+     */
+    function adminLogin($email, $password, $remember = false)
+    {
+        return Helper::adminAuthenticate($email, $password);
+    }
+}
+
+if (!function_exists('adminLogout')) {
+    /**
+     * Logout admin
+     * @return void
+     */
+    function adminLogout()
+    {
+        Helper::adminLogout();
+    }
+}
+
+// =========================================================
+// DATABASE HELPER SHORTCUTS
+// =========================================================
+
+if (!function_exists('db')) {
+    /**
+     * Get DB table instance
+     * @param string $table Table name
+     * @return \Framework\Helper\DB
+     */
+    function db($table)
+    {
+        return \Framework\Helper\DB::table($table);
+    }
+}
+
+if (!function_exists('table')) {
+    /**
+     * Get DB table instance (alias for db)
+     * @param string $table Table name
+     * @return \Framework\Helper\DB
+     */
+    function table($table)
+    {
+        return \Framework\Helper\DB::table($table);
+    }
+}
+
+// =========================================================
+// MODEL QUERY BUILDER SHORTCUTS
+// =========================================================
+
+if (!function_exists('model')) {
+    /**
+     * Get model instance for query building
+     * @param string $model Model class name
+     * @return \Framework\Model\Model
+     */
+    function model($model)
+    {
+        $class = "App\\Models\\$model";
+        if (class_exists($class)) {
+            return new $class();
+        }
+        throw new \Exception("Model class '$class' not found");
+    }
+}
+
+// =========================================================
+// REQUEST HELPER SHORTCUTS
+// =========================================================
+
+if (!function_exists('request')) {
+    /**
+     * Get request input
+     * @param string|null $key Key name
+     * @param mixed $default Default value
+     * @return mixed
+     */
+    function request($key = null, $default = null)
+    {
+        return Helper::input($key, $default);
+    }
+}
+
+if (!function_exists('post')) {
+    /**
+     * Get POST data
+     * @param string|null $key Key name
+     * @param mixed $default Default value
+     * @return mixed
+     */
+    function post($key = null, $default = null)
+    {
+        if ($key === null) {
+            return $_POST;
+        }
+        return $_POST[$key] ?? $default;
+    }
+}
+
+if (!function_exists('get')) {
+    /**
+     * Get GET data
+     * @param string|null $key Key name
+     * @param mixed $default Default value
+     * @return mixed
+     */
+    function get($key = null, $default = null)
+    {
+        if ($key === null) {
+            return $_GET;
+        }
+        return $_GET[$key] ?? $default;
+    }
+}
+
+if (!function_exists('has')) {
+    /**
+     * Check if request has key
+     * @param string $key Key name
+     * @return bool
+     */
+    function has($key)
+    {
+        return isset($_POST[$key]) || isset($_GET[$key]);
+    }
+}
+
+if (!function_exists('method')) {
+    /**
+     * Get request method
+     * @return string
+     */
+    function method()
+    {
+        return Helper::method();
+    }
+}
+
+if (!function_exists('isAjax')) {
+    /**
+     * Check if request is AJAX
+     * @return bool
+     */
+    function isAjax()
+    {
+        return Helper::isAjax();
+    }
+}
+
+// =========================================================
+// RESPONSE HELPER SHORTCUTS
+// =========================================================
+
+if (!function_exists('json')) {
+    /**
+     * Return JSON response
+     * @param array $data Data to encode
+     * @param int $statusCode HTTP status code
+     * @return void
+     */
+    function json($data, $statusCode = 200)
+    {
+        Helper::json($data, $statusCode);
+    }
+}
+
+if (!function_exists('abort')) {
+    /**
+     * Abort with error
+     * @param int $code HTTP status code
+     * @param string $message Error message
+     * @return void
+     */
+    function abort($code, $message = '')
+    {
+        http_response_code($code);
+        if (empty($message)) {
+            $message = "Error $code";
+        }
+        echo "<h1>Error $code</h1><p>$message</p>";
+        exit;
+    }
+}
+
+// =========================================================
+// UTILITY HELPERS
+// =========================================================
+
+if (!function_exists('now')) {
+    /**
+     * Get current datetime
+     * @return string
+     */
+    function now()
+    {
+        return date('Y-m-d H:i:s');
+    }
+}
+
+if (!function_exists('today')) {
+    /**
+     * Get current date
+     * @return string
+     */
+    function today()
+    {
+        return date('Y-m-d');
+    }
+}
+
+if (!function_exists('str_random')) {
+    /**
+     * Generate random string
+     * @param int $length Length of string
+     * @return string
+     */
+    function strRandom($length = 16)
+    {
+        return bin2hex(random_bytes($length / 2));
+    }
+}
+
+if (!function_exists('hashPassword')) {
+    /**
+     * Hash password
+     * @param string $password Password to hash
+     * @return string
+     */
+    function hashPassword($password)
+    {
+        return password_hash($password, PASSWORD_DEFAULT);
+    }
+}
+
+if (!function_exists('verifyPassword')) {
+    /**
+     * Verify password
+     * @param string $password Password to verify
+     * @param string $hash Hash to verify against
+     * @return bool
+     */
+    function verifyPassword($password, $hash)
+    {
+        return password_verify($password, $hash);
+    }
+}
+
+if (!function_exists('getClientIP')) {
+    /**
+     * Get client IP address
+     * @return string
+     */
+    function getClientIP()
+    {
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            return $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            return $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+        return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    }
+}
+
+if (!function_exists('userAgent')) {
+    /**
+     * Get user agent
+     * @return string
+     */
+    function userAgent()
+    {
+        return $_SERVER['HTTP_USER_AGENT'] ?? '';
+    }
+}
+
+if (!function_exists('referer')) {
+    /**
+     * Get referer URL
+     * @return string
+     */
+    function referer()
+    {
+        return $_SERVER['HTTP_REFERER'] ?? '';
+    }
+}
+
