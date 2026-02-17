@@ -2,12 +2,96 @@
 namespace Framework\Helper;
 use Framework\Helper\CSRF;
 use Framework\Helper\DB;
+use Framework\Helper\Auth;
 
 // We may have model classes; keep Admin import if used elsewhere
 use Framework\Model\Admin;
 
 class Helper
 {
+    // =========================================================
+    // AUTHENTICATION HELPERS (Universal - Works with any table)
+    // =========================================================
+
+    /**
+     * Get Auth instance for a specific table
+     * Usage: Auth::table('users')->login($email, $password)
+     *        Auth::table('admins')->login($email, $password)
+     */
+    public static function auth($table = 'users')
+    {
+        return Auth::table($table);
+    }
+
+    /**
+     * Login user (default: users table)
+     * @param string $email
+     * @param string $password
+     * @param string $table Table name (default: users)
+     * @param bool $remember
+     * @return object|null
+     */
+    public static function login($email, $password, $table = 'users', $remember = false)
+    {
+        return Auth::table($table)->login($email, $password, $remember);
+    }
+
+    /**
+     * Register new user
+     * @param array $data
+     * @param string $table
+     * @param bool $autoLogin
+     * @return object|null
+     */
+    public static function register($data, $table = 'users', $autoLogin = true)
+    {
+        return Auth::table($table)->register($data, $autoLogin);
+    }
+
+    /**
+     * Check if user is authenticated
+     * @param string $table
+     * @return bool
+     */
+    public static function check($table = 'users')
+    {
+        return Auth::table($table)->check();
+    }
+
+    /**
+     * Get authenticated user
+     * @param string $table
+     * @return object|null
+     */
+    public static function user($table = 'users')
+    {
+        return Auth::table($table)->user();
+    }
+
+    /**
+     * Logout user
+     * @param string $table
+     * @return void
+     */
+    public static function logout($table = 'users')
+    {
+        Auth::table($table)->logout();
+    }
+
+    /**
+     * Get authenticated user ID
+     * @param string $table
+     * @return int|null
+     */
+    public static function userId($table = 'users')
+    {
+        return Auth::table($table)->id();
+    }
+
+    // =========================================================
+    // BASIC HELPER FUNCTIONS
+    // =========================================================
+
     // Sanitize Inputs 
     public static function sanitize($input)
     {
@@ -455,64 +539,6 @@ class Helper
     public static function method(): string
     {
         return strtoupper($_SERVER['REQUEST_METHOD']);
-    }
-
-    public static function logout()
-    {
-        unset($_SESSION['user_id']);
-        if (isset($_COOKIE['remember_me'])) {
-            unset($_COOKIE['remember_me']);
-            setcookie('remember_me', '', time() - 3600, '/');
-        }
-    }
-
-    public static function check()
-    {
-        return (bool) self::auth();
-    }
-
-
-    /**
-        * Get the authenticated user.
-        *
-        * @return object|null
-
-    */
-    public static function auth()
-    {
-        // Return cached user if already fetched during this request
-        if (!empty($_SESSION['auth_user'])) {
-            return (object) $_SESSION['auth_user'];
-        }
-
-        $userId = $_SESSION['user_id'] ?? null;
-        $remember = $_COOKIE['remember_me'] ?? null;
-
-        // If we have a session user id, fetch from users table
-        if ($userId) {
-            $user = DB::table('users')->find($userId);
-            if ($user) {
-                $_SESSION['auth_user'] = $user;
-                return (object) $user;
-            }
-        }
-
-        // If remember cookie exists, try using it.
-        if ($remember) {
-            $tokenRow = DB::table('remember_me_token')->where('token', $remember)->first();
-
-            if ($tokenRow && strtotime($tokenRow['expires_at']) > time()) {
-                $user = DB::table('users')->find($tokenRow['user_id']);
-                if ($user) {
-                    // populate session for convenience
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['auth_user'] = $user;
-                    return (object) $user;
-                }
-            }
-        }
-
-        return null;
     }
 
     /**
