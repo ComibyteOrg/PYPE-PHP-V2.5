@@ -164,6 +164,7 @@ php pype.php migrate                 # Run pending migrations
 php pype.php migrate:rollback        # Rollback last migration
 php pype.php migrate:fresh           # Drop all & re-migrate
 php pype.php migrate:fresh:model Admin  # Fresh migrate specific model
+php pype.php make:migration User Post Category SiteSettings    # Create migrations for ALL models at once
 ```
 
 ### Seeder Commands
@@ -802,6 +803,9 @@ php pype.php migrate
 
 # Rollback last migration
 php pype.php migrate:rollback
+
+# Multiple models (RECOMMENDED)
+php pype.php make:migration User Post Category SiteSettings
 ```
 
 ## Authentication
