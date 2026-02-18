@@ -846,7 +846,15 @@ class Model extends DatabaseQuery
     {
         static::$querySelect = "SUM($column) as total";
         $result = static::getFirst();
-        return $result['total'] ?? 0;
+        
+        // Handle both array and object results
+        if (is_object($result) && isset($result->total)) {
+            return $result->total;
+        } elseif (is_array($result) && isset($result['total'])) {
+            return $result['total'];
+        }
+        
+        return 0;
     }
 
     /**
@@ -856,7 +864,15 @@ class Model extends DatabaseQuery
     {
         static::$querySelect = "AVG($column) as avg";
         $result = static::getFirst();
-        return $result['avg'] ?? 0;
+        
+        // Handle both array and object results
+        if (is_object($result) && isset($result->avg)) {
+            return $result->avg;
+        } elseif (is_array($result) && isset($result['avg'])) {
+            return $result['avg'];
+        }
+        
+        return 0;
     }
 
     /**
@@ -866,7 +882,15 @@ class Model extends DatabaseQuery
     {
         static::$querySelect = "MIN($column) as min";
         $result = static::getFirst();
-        return $result['min'] ?? 0;
+        
+        // Handle both array and object results
+        if (is_object($result) && isset($result->min)) {
+            return $result->min;
+        } elseif (is_array($result) && isset($result['min'])) {
+            return $result['min'];
+        }
+        
+        return 0;
     }
 
     /**
@@ -876,7 +900,15 @@ class Model extends DatabaseQuery
     {
         static::$querySelect = "MAX($column) as max";
         $result = static::getFirst();
-        return $result['max'] ?? 0;
+        
+        // Handle both array and object results
+        if (is_object($result) && isset($result->max)) {
+            return $result->max;
+        } elseif (is_array($result) && isset($result['max'])) {
+            return $result['max'];
+        }
+        
+        return 0;
     }
 
     /**
