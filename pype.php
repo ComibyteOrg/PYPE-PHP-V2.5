@@ -511,7 +511,7 @@ class PypeCLI
         $migrationDir = $this->projectRoot . '/migrations';
         $timestamp = date('Y_m_d_His');
         
-        // Pass model name directly so getMigrationTemplate can find it
+        // Pass model name directly so getMigrationTemplate can find it and use explicit table name
         $fileName = "{$timestamp}_{$modelName}.php";
         $filePath = $migrationDir . '/' . $fileName;
 
@@ -519,7 +519,7 @@ class PypeCLI
         
         $this->line("  Creating migration for {$modelName}...");
         
-        // Pass model name as migrationName so it matches directly
+        // Pass model name as migrationName so it matches directly and uses explicit $table
         $template = $this->getMigrationTemplate($className, $modelName);
 
         file_put_contents($filePath, $template);
@@ -1500,19 +1500,19 @@ EOT;
             $this->line("    Direct model match: {$directModelMatch}");
             $foundModel = $directModelMatch;
 
-            // Get the actual table name from the model
+            // Get the actual table name from the model - ALWAYS use explicit $table property
             $modelPath = $modelsDir . '/' . $directModelMatch . '.php';
             if (file_exists($modelPath)) {
                 $modelContent = file_get_contents($modelPath);
 
-                // Extract table name from the model file - check if explicitly defined
+                // Extract table name from the model file - MUST find explicit $table property
                 if (preg_match('/protected\s+static\s+\$table\s*=\s*[\'"]([^\'"]+)[\'"]/', $modelContent, $matches)) {
                     $tableName = $matches[1];
-                    $this->line("    Using explicit table name: {$tableName}");
+                    $this->line("    ✓ Using explicit table name: {$tableName}");
                 } else {
-                    // Use the pluralize function for proper pluralization
+                    // Fallback: Use the pluralize function for proper pluralization
                     $tableName = $this->modelToTable($directModelMatch);
-                    $this->line("    Generated table name: {$tableName}");
+                    $this->line("    ⚠ No explicit table name found, generated: {$tableName}");
                 }
             }
         }
