@@ -364,8 +364,30 @@ if (!function_exists('getFlash')) {
 if (!function_exists('dd')) {
     function dd(...$args)
     {
-        var_dump(...$args);
-        die;
+        // End any previous output buffers
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        echo '<div style="background: #0f172a; color: #10b981; padding: 20px; font-family: monospace; border-left: 4px solid #3b82f6; margin: 20px; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">';
+        echo '<div style="color: #3b82f6; font-weight: bold; margin-bottom: 15px; font-size: 14px;">';
+        echo '🔍 Debug Dump - ' . date('Y-m-d H:i:s');
+        echo '</div>';
+        
+        foreach ($args as $index => $arg) {
+            echo '<div style="margin-bottom: 20px;">';
+            echo '<span style="color: #f59e0b; font-size: 12px;">Argument ' . ($index + 1) . ':</span><br>';
+            echo '<pre style="color: #10b981; overflow-x: auto; padding: 15px; background: rgba(15, 23, 42, 0.8); border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.2);">';
+            var_dump($arg);
+            echo '</pre>';
+            echo '</div>';
+        }
+        
+        echo '<div style="color: #ef4444; font-size: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(59, 130, 246, 0.2);">';
+        echo '⚠ Execution terminated';
+        echo '</div>';
+        echo '</div>';
+        exit;
     }
 }
 
