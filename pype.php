@@ -4,7 +4,7 @@
 /**
  * Pype Framework CLI
  * 
- * Version: 1.0.0
+ * Version: 2.5.0
  * Description: Command-line interface for Pype PHP Framework
  */
 
@@ -312,17 +312,43 @@ class PypeCLI
     /**
      * Make Migration command - Create a new migration file
      */
-    private function makeMigrationCommand($migrationName = null)
+    private function makeMigrationCommand(...$migrationNames)
     {
-        if (!$migrationName) {
-            $this->error('Migration name is required!');
-            $this->line('Usage: php pype.php make:migration <migrationname>');
-            $this->line('Example: php pype.php make:migration create_users_table');
-            $this->line('Example: php pype.php make:migration add_email_to_users');
+        if (empty($migrationNames)) {
+            $this->error('Migration name(s) required!');
+            $this->line('Usage: php pype.php make:migration <name1> [name2] [name3]...');
+            $this->line('Examples:');
+            $this->line('  php pype.php make:migration User');
+            $this->line('  php pype.php make:migration User Post Category');
+            $this->line('  php pype.php make:migration create_posts_table');
             return;
         }
 
-        $this->createMigration($migrationName);
+        $createdCount = 0;
+        
+        foreach ($migrationNames as $migrationName) {
+            // Check if it's a model name (capitalize first letter)
+            $modelName = ucfirst($migrationName);
+            $modelsDir = $this->projectRoot . '/App/Models';
+            
+            // Check if model exists
+            if (is_dir($modelsDir) && file_exists($modelsDir . '/' . $modelName . '.php')) {
+                // Create migration for model
+                $this->createMigrationForModel($modelName);
+                $createdCount++;
+            } else {
+                // Create custom migration
+                $this->createMigration($migrationName);
+                $createdCount++;
+            }
+        }
+        
+        if ($createdCount > 1) {
+            $this->line('');
+            $this->success("✅ {$createdCount} migration(s) created!");
+            $this->line('');
+            $this->line('Next: Run "php pype.php migrate" to run all migrations');
+        }
     }
 
     /**
@@ -412,6 +438,25 @@ class PypeCLI
             $this->success("✅ {$ran} migration(s) executed successfully!");
         }
         $this->line('');
+    }
+
+    /**
+     * Create migration for a specific model
+     */
+    private function createMigrationForModel($modelName)
+    {
+        $migrationDir = $this->projectRoot . '/migrations';
+        $timestamp = date('Y_m_d_His');
+        $migrationName = 'create_' . strtolower($modelName) . 's_table';
+        $fileName = "{$timestamp}_{$migrationName}.php";
+        $filePath = $migrationDir . '/' . $fileName;
+
+        $className = $modelName;
+        $template = $this->getMigrationTemplate($className, $migrationName);
+
+        file_put_contents($filePath, $template);
+
+        $this->success("  ✓ Created: {$fileName}");
     }
 
     /**
@@ -1321,6 +1366,7 @@ EOT;
         if ($isCreateTable) {
             // Extract table name from migration name (e.g., create_users_table -> users)
             $tableName = str_replace(['create_', '_table'], '', $migrationName);
+            $this->line("    Looking for model with table: {$tableName}");
 
             if (is_dir($modelsDir)) {
                 $files = scandir($modelsDir);
@@ -1329,8 +1375,10 @@ EOT;
                         $modelName = substr($file, 0, -4);
                         // Check if model table name matches (singularize model name)
                         $modelTableName = strtolower($modelName) . 's';
+                        $this->line("    Checking {$modelName} -> table: {$modelTableName}");
                         if ($modelTableName === $tableName) {
                             $foundModel = $modelName;
+                            $this->line("    ✓ Found matching model: {$foundModel}");
                             break;
                         }
                     }
@@ -1339,6 +1387,7 @@ EOT;
         }
         // If it's a direct model name match
         elseif ($directModelMatch) {
+            $this->line("    Direct model match: {$directModelMatch}");
             $foundModel = $directModelMatch;
 
             // Get the actual table name from the model
@@ -1360,35 +1409,45 @@ EOT;
             // Read the model file to extract the schema method content
             $modelPath = $modelsDir . '/' . $foundModel . '.php';
             $schemaMethodContent = "// Unable to extract schema - using default\n            \$table->id();\n            \$table->timestamps();";
-            
+
             if (file_exists($modelPath)) {
                 $modelCode = file_get_contents($modelPath);
+
+                // Extract the schema method content - simple line by line parsing
+                $lines = file($modelPath, FILE_IGNORE_NEW_LINES);
+                $inSchema = false;
+                $schemaLines = [];
                 
-                // Extract the schema method content
-                if (preg_match('/public\s+static\s+function\s+schema\([^)]*\)\s*\{(.*)\}/s', $modelCode, $matches)) {
-                    $methodBody = $matches[1];
+                foreach ($lines as $line) {
+                    // Check if we're entering the schema method
+                    if (strpos($line, 'function schema($table)') !== false || 
+                        strpos($line, 'function schema( $table )') !== false ||
+                        preg_match('/function\s+schema\s*\(\s*\$table\s*\)/', $line)) {
+                        $inSchema = true;
+                        continue;
+                    }
                     
-                    // Clean up the method body and convert to proper migration syntax
-                    $lines = explode("\n", $methodBody);
-                    $cleanedLines = [];
-                    
-                    foreach ($lines as $line) {
+                    // If we're in the schema method
+                    if ($inSchema) {
                         $trimmedLine = trim($line);
-                        if (!empty($trimmedLine) && $trimmedLine !== '{' && $trimmedLine !== '}') {
-                            // Add proper indentation (4 spaces for the function, plus 12 more for the table calls)
-                            $cleanedLines[] = '            ' . $trimmedLine;
+                        
+                        // Check if we've exited the schema method
+                        if ($trimmedLine === '}' || preg_match('/^(public|protected|private)\s+/', $trimmedLine)) {
+                            break;
+                        }
+                        
+                        // Only keep lines with table builder calls
+                        if (strpos($trimmedLine, '$table->') === 0) {
+                            $schemaLines[] = '            ' . $trimmedLine;
                         }
                     }
-                    
-                    $schemaMethodContent = implode("\n", $cleanedLines);
-                    
-                    // If the result is empty or just whitespace, use default
-                    if (trim(str_replace(' ', '', str_replace("\n", '', $schemaMethodContent))) === '') {
-                        $schemaMethodContent = "            \$table->id();\n            \$table->timestamps();";
-                    }
+                }
+                
+                if (!empty($schemaLines)) {
+                    $schemaMethodContent = implode("\n", $schemaLines);
                 }
             }
-            
+
             $template = <<<EOT
 <?php
 
