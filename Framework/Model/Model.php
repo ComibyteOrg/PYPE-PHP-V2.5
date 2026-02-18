@@ -886,7 +886,15 @@ class Model extends DatabaseQuery
     {
         static::$querySelect = "COUNT(*) as count";
         $result = static::getFirst();
-        return intval($result['count'] ?? 0);
+        
+        // Handle both array and object results
+        if (is_object($result) && isset($result->count)) {
+            return intval($result->count);
+        } elseif (is_array($result) && isset($result['count'])) {
+            return intval($result['count']);
+        }
+        
+        return 0;
     }
 
     /**
