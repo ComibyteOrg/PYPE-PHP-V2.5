@@ -337,8 +337,9 @@ class PypeCLI
                 $this->createMigrationForModel($modelName);
                 $createdCount++;
             } else {
-                // Create custom migration
-                $this->createMigration($migrationName);
+                // Create custom migration - try to pluralize if it looks like a model name
+                $tableName = $this->modelToTable($migrationName);
+                $this->createMigration('create_' . $tableName . '_table');
                 $createdCount++;
             }
         }
@@ -441,22 +442,110 @@ class PypeCLI
     }
 
     /**
+     * Pluralize a word (handles irregular plurals)
+     */
+    private function pluralize($word)
+    {
+        // Irregular plurals
+        $irregular = [
+            'category' => 'categories',
+            'person' => 'people',
+            'child' => 'children',
+            'man' => 'men',
+            'woman' => 'women',
+            'foot' => 'feet',
+            'tooth' => 'teeth',
+            'goose' => 'geese',
+            'mouse' => 'mice',
+            'datum' => 'data',
+            'phenomenon' => 'phenomena',
+            'criterion' => 'criteria',
+            'analysis' => 'analyses',
+            'basis' => 'bases',
+            'crisis' => 'crises',
+            'thesis' => 'theses',
+            'hypothesis' => 'hypotheses',
+            'oasis' => 'oases',
+            'diagnosis' => 'diagnoses',
+            'parenthesis' => 'parentheses',
+            'synthesis' => 'syntheses',
+        ];
+
+        $lowerWord = strtolower($word);
+
+        // Check irregular plurals
+        if (isset($irregular[$lowerWord])) {
+            return $irregular[$lowerWord];
+        }
+
+        // Words ending in 'y' preceded by consonant → change 'y' to 'ies'
+        if (preg_match('/[aeiou]y$/', $lowerWord)) {
+            return $word . 's';  // vowel + y, just add s (e.g., day → days)
+        }
+        if (preg_match('/[^aeiou]y$/', $lowerWord)) {
+            return substr($word, 0, -1) . 'ies';  // consonant + y (e.g., category → categories)
+        }
+
+        // Words ending in 's', 'ss', 'sh', 'ch', 'x', 'z', 'o' → add 'es'
+        if (preg_match('/(s|ss|sh|ch|x|z|o)$/i', $lowerWord)) {
+            return $word . 'es';
+        }
+
+        // Words ending in 'f' or 'fe' → change to 'ves'
+        if (preg_match('/f$/', $lowerWord)) {
+            return substr($word, 0, -1) . 'ves';
+        }
+        if (preg_match('/fe$/', $lowerWord)) {
+            return substr($word, 0, -2) . 'ves';
+        }
+
+        // Default: just add 's'
+        return $word . 's';
+    }
+
+    /**
      * Create migration for a specific model
      */
     private function createMigrationForModel($modelName)
     {
         $migrationDir = $this->projectRoot . '/migrations';
         $timestamp = date('Y_m_d_His');
-        $migrationName = 'create_' . strtolower($modelName) . 's_table';
-        $fileName = "{$timestamp}_{$migrationName}.php";
+        
+        // Pass model name directly so getMigrationTemplate can find it
+        $fileName = "{$timestamp}_{$modelName}.php";
         $filePath = $migrationDir . '/' . $fileName;
 
         $className = $modelName;
-        $template = $this->getMigrationTemplate($className, $migrationName);
+        
+        $this->line("  Creating migration for {$modelName}...");
+        
+        // Pass model name as migrationName so it matches directly
+        $template = $this->getMigrationTemplate($className, $modelName);
 
         file_put_contents($filePath, $template);
 
-        $this->success("  ✓ Created: {$fileName}");
+        $this->success("    ✓ Created: {$fileName}");
+    }
+
+    /**
+     * Convert model name to table name (handles plurals)
+     */
+    private function modelToTable($modelName)
+    {
+        // Convert PascalCase to snake_case and pluralize
+        $snakeCase = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $modelName));
+        
+        // Get the last word (main noun) for pluralization
+        $parts = explode('_', $snakeCase);
+        $lastPart = array_pop($parts);
+        
+        // Pluralize the last part
+        $pluralized = $this->pluralize($lastPart);
+        
+        // Rebuild the table name
+        $parts[] = $pluralized;
+        
+        return implode('_', $parts);
     }
 
     /**
@@ -689,11 +778,13 @@ class PypeCLI
     private function dropAllTables()
     {
         $dbType = $_ENV['DB_TYPE'] ?? $_SERVER['DB_TYPE'] ?? 'mysql';
+        $this->line("  Database type: {$dbType}");
 
         if ($dbType === 'sqlite') {
             // SQLite: Get all tables
             $result = \Framework\Helper\DB::rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'migrations'");
             $tables = $result->fetchAll(\PDO::FETCH_COLUMN);
+            $this->line("  Found " . count($tables) . " table(s) to drop");
             foreach ($tables as $table) {
                 \Framework\Helper\DB::rawQuery("DROP TABLE IF EXISTS {$table}");
                 $this->success("    ✓ Dropped table: {$table}");
@@ -702,6 +793,7 @@ class PypeCLI
             // MySQL/PostgreSQL: Get all tables
             $result = \Framework\Helper\DB::rawQuery("SHOW TABLES");
             $tables = $result->fetchAll(\PDO::FETCH_COLUMN);
+            $this->line("  Found " . count($tables) . " table(s) to drop");
             foreach ($tables as $table) {
                 if ($table !== 'migrations') {
                     \Framework\Helper\DB::rawQuery("DROP TABLE IF EXISTS {$table}");
@@ -716,7 +808,9 @@ class PypeCLI
      */
     private function clearMigrationsTable()
     {
+        $this->line("  Clearing migrations table...");
         \Framework\Helper\DB::rawQuery("DELETE FROM migrations");
+        $this->success("    ✓ Migrations table cleared");
     }
 
     /**
@@ -724,6 +818,7 @@ class PypeCLI
      */
     private function runAllMigrations()
     {
+        $this->line('  Setting up migrations table...');
         $this->ensureMigrationsTable();
 
         $migrationDir = $this->projectRoot . '/migrations';
@@ -733,6 +828,13 @@ class PypeCLI
         }
 
         $files = glob($migrationDir . '/*.php');
+        $this->line('  Found ' . count($files) . ' migration file(s)');
+        
+        if (empty($files)) {
+            $this->warning('⚠ No migration files found');
+            return;
+        }
+        
         sort($files);
 
         $ran = 0;
@@ -751,6 +853,8 @@ class PypeCLI
                     $this->recordMigration($fileName);
                     $this->success("    ✓ Migrated: {$fileName}");
                     $ran++;
+                } else {
+                    $this->error("    ✗ Class '{$className}' not found");
                 }
             } catch (\Exception $e) {
                 $this->error("    ✗ Error: " . $e->getMessage());
@@ -1338,8 +1442,11 @@ EOT;
      */
     private function getMigrationTemplate($className, $migrationName)
     {
+        $this->line("  getMigrationTemplate called with: className={$className}, migrationName={$migrationName}");
+        
         // Check if this is a create_*_table migration
         $isCreateTable = strpos($migrationName, 'create_') === 0 && strpos($migrationName, '_table') !== false;
+        $this->line("  isCreateTable: " . ($isCreateTable ? 'true' : 'false'));
 
         // Also check if the migration name matches a model name directly
         $directModelMatch = null;
@@ -1347,12 +1454,15 @@ EOT;
 
         if (is_dir($modelsDir)) {
             $files = scandir($modelsDir);
+            $this->line("  Scanning models directory, found " . count($files) . " files");
+            
             foreach ($files as $file) {
                 if (substr($file, -4) === '.php') {
                     $modelName = substr($file, 0, -4);
                     // Check if migration name matches model name exactly
                     if (strtolower($migrationName) === strtolower($modelName)) {
                         $directModelMatch = $modelName;
+                        $this->line("  ✓ Direct model match found: {$modelName}");
                         break;
                     }
                 }
@@ -1373,8 +1483,8 @@ EOT;
                 foreach ($files as $file) {
                     if (substr($file, -4) === '.php') {
                         $modelName = substr($file, 0, -4);
-                        // Check if model table name matches (singularize model name)
-                        $modelTableName = strtolower($modelName) . 's';
+                        // Check if model table name matches (use modelToTable for proper pluralization)
+                        $modelTableName = $this->modelToTable($modelName);
                         $this->line("    Checking {$modelName} -> table: {$modelTableName}");
                         if ($modelTableName === $tableName) {
                             $foundModel = $modelName;
@@ -1395,12 +1505,14 @@ EOT;
             if (file_exists($modelPath)) {
                 $modelContent = file_get_contents($modelPath);
 
-                // Extract table name from the model file
+                // Extract table name from the model file - check if explicitly defined
                 if (preg_match('/protected\s+static\s+\$table\s*=\s*[\'"]([^\'"]+)[\'"]/', $modelContent, $matches)) {
                     $tableName = $matches[1];
+                    $this->line("    Using explicit table name: {$tableName}");
                 } else {
-                    // Default to pluralized model name if no table specified
-                    $tableName = strtolower($directModelMatch) . 's';
+                    // Use the pluralize function for proper pluralization
+                    $tableName = $this->modelToTable($directModelMatch);
+                    $this->line("    Generated table name: {$tableName}");
                 }
             }
         }
@@ -1412,40 +1524,66 @@ EOT;
 
             if (file_exists($modelPath)) {
                 $modelCode = file_get_contents($modelPath);
+                $this->line("    Reading model: {$modelPath}");
+                $this->line("    Model code length: " . strlen($modelCode) . " bytes");
 
                 // Extract the schema method content - simple line by line parsing
                 $lines = file($modelPath, FILE_IGNORE_NEW_LINES);
                 $inSchema = false;
                 $schemaLines = [];
+                $braceCount = 0;
                 
-                foreach ($lines as $line) {
+                $this->line("    Parsing " . count($lines) . " lines...");
+                
+                foreach ($lines as $lineNum => $line) {
+                    // Debug: show schema-related lines
+                    if (strpos($line, 'schema') !== false || strpos($line, '$table->') !== false) {
+                        $this->line("    Line " . ($lineNum + 1) . ": " . trim($line));
+                    }
+                    
                     // Check if we're entering the schema method
-                    if (strpos($line, 'function schema($table)') !== false || 
+                    if (!$inSchema && (strpos($line, 'function schema($table)') !== false || 
                         strpos($line, 'function schema( $table )') !== false ||
-                        preg_match('/function\s+schema\s*\(\s*\$table\s*\)/', $line)) {
+                        preg_match('/function\s+schema\s*\(\s*\$table\s*\)/', $line))) {
                         $inSchema = true;
+                        $braceCount = 0;
+                        $this->line("    → Found schema method start");
                         continue;
                     }
                     
                     // If we're in the schema method
                     if ($inSchema) {
+                        // Count braces to track nested blocks
+                        $braceCount += substr_count($line, '{');
+                        $braceCount -= substr_count($line, '}');
+                        
                         $trimmedLine = trim($line);
                         
-                        // Check if we've exited the schema method
-                        if ($trimmedLine === '}' || preg_match('/^(public|protected|private)\s+/', $trimmedLine)) {
+                        // Check if we've exited the schema method (all braces closed)
+                        if ($braceCount <= 0 && strpos($trimmedLine, '}') !== false) {
+                            $this->line("    → Found schema method end (braceCount: {$braceCount})");
                             break;
                         }
                         
                         // Only keep lines with table builder calls
                         if (strpos($trimmedLine, '$table->') === 0) {
+                            // Remove any trailing comments
+                            $trimmedLine = preg_replace('/\s*\/\/.*$/', '', $trimmedLine);
                             $schemaLines[] = '            ' . $trimmedLine;
+                            $this->line("    → Added: {$trimmedLine}");
                         }
                     }
                 }
                 
+                $this->line("    Found " . count($schemaLines) . " schema lines");
+                
                 if (!empty($schemaLines)) {
                     $schemaMethodContent = implode("\n", $schemaLines);
+                } else {
+                    $this->line("    ⚠ No schema lines found, using default");
                 }
+            } else {
+                $this->line("    ⚠ Model file not found: {$modelPath}");
             }
 
             $template = <<<EOT
