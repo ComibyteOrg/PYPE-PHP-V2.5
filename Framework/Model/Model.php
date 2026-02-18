@@ -128,13 +128,10 @@ class Model extends DatabaseQuery
         $table = static::getTable();
         $primaryKey = static::$primaryKey;
 
-        $result = $instance->select($table, "*", "$primaryKey = ?", "i", [$id]);
-
-        if ($result && $row = $result->fetch_assoc()) {
-            return new static($row);
-        }
-
-        return null;
+        // Use PDO-style query
+        $result = static::where($primaryKey, $id)->first();
+        
+        return $result;
     }
 
     /**
@@ -143,16 +140,10 @@ class Model extends DatabaseQuery
      */
     public static function findBy($column, $value)
     {
-        $instance = new static();
-        $table = static::getTable();
-
-        $result = $instance->select($table, "*", "$column = ?", "s", [$value]);
-
-        if ($result && $row = $result->fetch_assoc()) {
-            return new static($row);
-        }
-
-        return null;
+        // Use query builder
+        $result = static::where($column, $value)->first();
+        
+        return $result;
     }
 
     /**
@@ -432,8 +423,15 @@ class Model extends DatabaseQuery
     /**
      * WHERE - AND condition
      */
-    public static function where($column, $value, $operator = '=')
+    public static function where($column, $operator, $value = null)
     {
+        // Handle both where('column', 'value') and where('column', 'operator', 'value')
+        if ($value === null) {
+            // where('column', 'value') - default operator is '='
+            $value = $operator;
+            $operator = '=';
+        }
+        
         static::$queryWhere[] = ['AND', $column, $operator, $value];
         return new static();
     }
@@ -441,8 +439,14 @@ class Model extends DatabaseQuery
     /**
      * OR WHERE - OR condition
      */
-    public static function orWhere($column, $value, $operator = '=')
+    public static function orWhere($column, $operator, $value = null)
     {
+        // Handle both orWhere('column', 'value') and orWhere('column', 'operator', 'value')
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+        
         static::$queryWhere[] = ['OR', $column, $operator, $value];
         return new static();
     }
@@ -715,7 +719,9 @@ class Model extends DatabaseQuery
                     $bindValues[] = $w[3];
                 }
             } else {
-                $condition = "{$w[0]} {$w[1]} {$w[2]} ?";
+                // Format: column operator ?
+                // $w = ['AND', 'id', '=', 3]
+                $condition = "{$w[1]} {$w[2]} ?";
                 $bindValues[] = $w[3];
             }
 
@@ -727,7 +733,7 @@ class Model extends DatabaseQuery
             $conditions[] = $condition;
         }
 
-        return $sql . implode(' ', $conditions);
+        return $sql . implode(' AND ', $conditions);
     }
 
     /**
@@ -763,8 +769,10 @@ class Model extends DatabaseQuery
     protected static function executeQuery($sql, $bindValues)
     {
         if (static::$queryDebug) {
+            echo "<pre style='background:#000;color:#0f0;padding:20px;'>";
             echo "SQL: $sql\n";
             print_r($bindValues);
+            echo "</pre>";
         }
 
         $stmt = static::getStaticConnection()->prepare($sql);
