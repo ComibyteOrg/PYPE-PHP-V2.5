@@ -167,37 +167,37 @@ class Route
 
     public static function getUrl(string $name, array $parameters = []): ?string
     {
-        error_log("Route::getUrl called with name: $name, parameters: " . json_encode($parameters));
+        // error_log("Route::getUrl called with name: $name, parameters: " . json_encode($parameters));
 
         foreach (self::$routes as $index => $route) {
             if (isset($route['name']) && $route['name'] === $name) {
-                error_log("Found route at index $index: " . json_encode($route));
+                // error_log("Found route at index $index: " . json_encode($route));
                 $path = $route['path'];
-                error_log("Original path: $path");
+                // error_log("Original path: $path");
 
                 // Replace parameters in path
                 foreach ($parameters as $key => $value) {
-                    error_log("Processing parameter: $key = $value");
+                    // error_log("Processing parameter: $key = $value");
                     if (strpos($path, '{' . $key . '}') !== false) {
                         $path = str_replace('{' . $key . '}', $value, $path);
                         unset($parameters[$key]);
-                        error_log("Path after replacement: $path");
+                        // error_log("Path after replacement: $path");
                     } else {
-                        error_log("Parameter $key not found in path");
+                        // error_log("Parameter $key not found in path");
                     }
                 }
 
                 // Append remaining parameters as query string
                 if (!empty($parameters)) {
                     $path .= '?' . http_build_query($parameters);
-                    error_log("Path with query string: $path");
+                    // error_log("Path with query string: $path");
                 }
 
-                error_log("Returning path: $path");
+                // error_log("Returning path: $path");
                 return $path;
             }
         }
-        error_log("Route not found for name: $name");
+        // error_log("Route not found for name: $name");
         return null;
     }
 
@@ -291,9 +291,9 @@ class Route
                 [$controller, $method] = $handler;
 
                 // Debug information
-                error_log("Attempting to load controller: {$controller}");
-                error_log("Class exists: " . (class_exists($controller) ? 'Yes' : 'No'));
-                error_log("Autoload functions: " . print_r(spl_autoload_functions(), true));
+                // error_log("Attempting to load controller: {$controller}");
+                // error_log("Class exists: " . (class_exists($controller) ? 'Yes' : 'No'));
+                // error_log("Autoload functions: " . print_r(spl_autoload_functions(), true));
 
                 if (class_exists($controller)) {
 
