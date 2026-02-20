@@ -24,7 +24,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Debug: log request URI and session id to help trace redirect loops (remove in production)
-error_log("[DEBUG] Request URI: " . ($_SERVER['REQUEST_URI'] ?? '') . " | PHPSESSID: " . session_id());
+// error_log("[DEBUG] Request URI: " . ($_SERVER['REQUEST_URI'] ?? '') . " | PHPSESSID: " . session_id());
 
 use Framework\Router\Route;
 use Framework\Middleware\AuthMiddleware;
