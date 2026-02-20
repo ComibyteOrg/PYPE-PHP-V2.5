@@ -1079,7 +1079,7 @@ EOT;
         $this->info('Press Ctrl+C to stop the server');
         $this->line('');
 
-        $publicDir = $this->projectRoot . '/public';
+        $publicDir = $this->projectRoot . '/';
 
         // If no public directory, use root
         if (!is_dir($publicDir)) {
