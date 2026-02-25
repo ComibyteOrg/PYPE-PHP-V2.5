@@ -75,6 +75,10 @@ class PypeCLI
                 'callback' => [$this, 'migrateFreshModelCommand'],
                 'description' => 'Drop and re-create a specific model\'s table'
             ],
+            'migrate:status' => [
+                'callback' => [$this, 'migrateStatusCommand'],
+                'description' => 'Show the status of all migrations'
+            ],
             'make:seeder' => [
                 'callback' => [$this, 'makeSeederCommand'],
                 'description' => 'Create a new seeder file'
@@ -406,6 +410,8 @@ class PypeCLI
         $files = glob($migrationDir . '/*.php');
         sort($files);
 
+        $this->line("  Found " . count($files) . " migration file(s), " . count($migratedFiles) . " already run");
+
         $ran = 0;
         foreach ($files as $file) {
             $fileName = basename($file);
@@ -429,6 +435,8 @@ class PypeCLI
                 } catch (\Exception $e) {
                     $this->error("    ✗ Error: " . $e->getMessage());
                 }
+            } else {
+                $this->line("  Skipping: {$fileName} (already run)");
             }
         }
 
@@ -740,6 +748,100 @@ class PypeCLI
         $this->line('');
         $this->success('✅ Model migration completed!');
         $this->line('');
+    }
+
+    /**
+     * Migrate Status command - Show the status of all migrations
+     */
+    private function migrateStatusCommand()
+    {
+        $this->line('');
+        $this->info('📊 Migration Status');
+        $this->line('');
+
+        // Load environment and required files
+        $this->loadRequiredFiles();
+
+        $migrationDir = $this->projectRoot . '/migrations';
+        if (!is_dir($migrationDir)) {
+            $this->warning('⚠ No migrations folder found');
+            return;
+        }
+
+        // Get all migration files
+        $files = glob($migrationDir . '/*.php');
+        sort($files);
+
+        if (empty($files)) {
+            $this->warning('⚠ No migration files found');
+            return;
+        }
+
+        // Get migrated files
+        $migratedFiles = $this->getMigratedFiles();
+
+        $this->line('  ' . str_repeat('-', 80));
+        $this->line('  | ' . str_pad('Status', 10) . ' | ' . str_pad('Migration', 50) . ' | Batch |');
+        $this->line('  ' . str_repeat('-', 80));
+
+        $total = 0;
+        $migrated = 0;
+        $pending = 0;
+
+        foreach ($files as $file) {
+            $fileName = basename($file);
+            $total++;
+
+            if (in_array($fileName, $migratedFiles)) {
+                // Get batch number
+                $batch = $this->getMigrationBatch($fileName);
+                $this->line('  | ' . $this->colorize('✓ Ran', 'green') . '    | ' . str_pad(substr($fileName, 0, 50), 50) . ' | ' . str_pad($batch, 5) . ' |');
+                $migrated++;
+            } else {
+                $this->line('  | ' . $this->colorize('Pending', 'yellow') . ' | ' . str_pad(substr($fileName, 0, 50), 50) . ' | ' . str_pad('-', 5) . ' |');
+                $pending++;
+            }
+        }
+
+        $this->line('  ' . str_repeat('-', 80));
+        $this->line('');
+        $this->line("  Total: {$total} | Migrated: {$migrated} | Pending: {$pending}");
+        $this->line('');
+    }
+
+    /**
+     * Get batch number for a specific migration
+     */
+    private function getMigrationBatch($fileName)
+    {
+        require_once $this->projectRoot . '/Framework/Database/Connect.php';
+        require_once $this->projectRoot . '/Framework/Database/DatabaseFactory.php';
+        require_once $this->projectRoot . '/Framework/Database/DatabaseInterface.php';
+        require_once $this->projectRoot . '/Framework/Database/DatabaseQuery.php';
+
+        $connect = new \Framework\Database\Connect();
+
+        try {
+            if ($connect->connection instanceof \mysqli) {
+                $stmt = $connect->connection->prepare("SELECT batch FROM migrations WHERE migration = ?");
+                $stmt->bind_param("s", $fileName);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($row = $result->fetch_assoc()) {
+                    return $row['batch'];
+                }
+            } elseif ($connect->connection instanceof \PDO) {
+                $stmt = $connect->connection->prepare("SELECT batch FROM migrations WHERE migration = ?");
+                $stmt->execute([$fileName]);
+                if ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    return $row['batch'];
+                }
+            }
+        } catch (\Exception $e) {
+            return '-';
+        }
+
+        return '-';
     }
 
     /**
@@ -1760,33 +1862,60 @@ EOT;
      */
     private function getMigratedFiles()
     {
-        require_once $this->projectRoot . '/Framework/Database/Connect.php';
-        require_once $this->projectRoot . '/Framework/Database/DatabaseFactory.php';
-        require_once $this->projectRoot . '/Framework/Database/DatabaseInterface.php';
-        require_once $this->projectRoot . '/Framework/Database/DatabaseQuery.php';
-
-        $connect = new \Framework\Database\Connect();
-
         try {
+            require_once $this->projectRoot . '/Framework/Database/Connect.php';
+            require_once $this->projectRoot . '/Framework/Database/DatabaseFactory.php';
+            require_once $this->projectRoot . '/Framework/Database/DatabaseInterface.php';
+            require_once $this->projectRoot . '/Framework/Database/DatabaseQuery.php';
+
+            $connect = new \Framework\Database\Connect();
+
+            // Check if migrations table exists first
+            $tableExists = false;
+            if ($connect->connection instanceof \mysqli) {
+                $result = $connect->connection->query("SHOW TABLES LIKE 'migrations'");
+                $tableExists = $result && $result->num_rows > 0;
+            } elseif ($connect->connection instanceof \PDO) {
+                try {
+                    $connect->connection->query("SELECT 1 FROM migrations LIMIT 1");
+                    $tableExists = true;
+                } catch (\Exception $e) {
+                    $tableExists = false;
+                }
+            } elseif ($connect->connection instanceof \SQLite3) {
+                $result = $connect->connection->querySingle("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'", true);
+                $tableExists = !empty($result);
+            }
+
+            if (!$tableExists) {
+                return [];
+            }
+
             if ($connect->connection instanceof \mysqli) {
                 $result = $connect->connection->query("SELECT migration FROM migrations");
                 $migrations = [];
-                while ($row = $result->fetch_assoc()) {
-                    $migrations[] = $row['migration'];
+                if ($result) {
+                    while ($row = $result->fetch_assoc()) {
+                        $migrations[] = $row['migration'];
+                    }
                 }
                 return $migrations;
             } elseif ($connect->connection instanceof \SQLite3) {
                 $result = $connect->connection->query("SELECT migration FROM migrations");
                 $migrations = [];
-                while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
-                    $migrations[] = $row['migration'];
+                if ($result) {
+                    while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+                        $migrations[] = $row['migration'];
+                    }
                 }
                 return $migrations;
             } elseif ($connect->connection instanceof \PDO) {
                 $stmt = $connect->connection->query("SELECT migration FROM migrations");
                 $migrations = [];
-                while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-                    $migrations[] = $row['migration'];
+                if ($stmt) {
+                    while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                        $migrations[] = $row['migration'];
+                    }
                 }
                 return $migrations;
             }
@@ -1924,6 +2053,27 @@ EOT;
         }
 
         return null;
+    }
+
+    /**
+     * Colorize output text
+     */
+    private function colorize($text, $color)
+    {
+        $colors = [
+            'green' => "\033[32m",
+            'yellow' => "\033[33m",
+            'red' => "\033[31m",
+            'blue' => "\033[34m",
+            'cyan' => "\033[36m",
+            'reset' => "\033[0m"
+        ];
+
+        if (!isset($colors[$color])) {
+            $color = 'reset';
+        }
+
+        return $colors[$color] . $text . $colors['reset'];
     }
 }
 
